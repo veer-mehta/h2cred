@@ -8,10 +8,14 @@ async function main() {
 	const HydrogenCredit = await ethers.getContractFactory(
 		"GreenHydrogenCredit"
 	)
-	const admin = deployer.address;
-	const treasury = deployer.address;
+	const admin = deployer.address
+	const treasury = deployer.address
 	const price_per_token = ethers.utils.parseUnits("0.01", "ether")
-	const contract = await HydrogenCredit.deploy(admin, treasury, price_per_token)
+	const contract = await HydrogenCredit.deploy(
+		admin,
+		treasury,
+		price_per_token
+	)
 
 	await contract.deployed()
 

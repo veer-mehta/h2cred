@@ -8,6 +8,7 @@ module.exports = {
 		sepolia: {
 			url: process.env.ALCHEMY_URL,
 			accounts: [process.env.PRIVATE_KEY],
+			timeout: 600000 
 		},
 	},
 }

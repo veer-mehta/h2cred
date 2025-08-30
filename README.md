@@ -2,6 +2,18 @@
 
 A Solidity-based smart contract project for buying, transferring, and managing hydrogen credits on the Ethereum blockchain. This project uses Hardhat for development, testing, and deployment.
 
+## Screenshots
+
+### Landing Page
+![Landing Page](media/landing_page.png)
+
+### Seller Dashboard
+![Seller Dashboard](media/seller_dashboard.png)
+
+### Buyer Dashboard
+![Buyer Dashboard](media/buyer_dashboard.png)
+
+
 ## Project Structure
 
 - `contracts/HydrogenCredit.sol` — Main Solidity smart contract for hydrogen credits.
