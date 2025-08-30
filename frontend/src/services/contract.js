@@ -1,27 +1,27 @@
 import { ethers } from "ethers";
+import detectEthereumProvider from "@metamask/detect-provider";
 
-// deployed contract addresses
-const GHC_ADDRESS = "0x4B1EBa5AEaaEcccae18014c0Dc461aa1ba9701e2";
-const PAYMENT_TOKEN_ADDRESS = "0x674844E65a27C8a6A4C064e6efa2050a64c6828E";
+const GHC_ADDRESS = "0x96c99BDa19A40fEAF449E3b2fEFA6b5Db7D0C487";
+const PAYMENT_TOKEN_ADDRESS = "0xc718f7a935b77E33556f45d5AF2A838C7D23204c";
 
-// import the ABI JSONs from Hardhat build artifacts
-import GHCArtifact from "../../../blockchain/artifacts/contracts/GreenHydrogenCredit.sol/GreenHydrogenCredit.json";
-import PaymentArtifact from "../../../blockchain/artifacts/contracts/MockERC20.sol/MockERC20.json";
+import GHC_ABI from "../../../blockchain/artifacts/contracts/GreenHydrogenCredit.sol";
+import PAYMENT_ABI from "../../../blockchain/artifacts/contracts/MockERC20.sol";
 
 export async function getContracts() {
-    if (!window.ethereum) throw new Error("MetaMask not detected");
+  const provider = await detectEthereumProvider();
+  if (!provider) throw new Error("MetaMask not detected");
 
-    const provider = new ethers.BrowserProvider(window.ethereum);
-    const signer = await provider.getSigner();
+  const web3Provider = new ethers.providers.Web3Provider(provider);
+  const signer = web3Provider.getSigner();
 
-    const ghcContract = new ethers.Contract(GHC_ADDRESS, GHCArtifact.abi, signer);
-    const paymentContract = new ethers.Contract(
-        PAYMENT_TOKEN_ADDRESS,
-        PaymentArtifact.abi,
-        signer
-    );
+  const ghcContract = new ethers.Contract(GHC_ADDRESS, GHC_ABI, signer);
+  const paymentContract = new ethers.Contract(
+    PAYMENT_TOKEN_ADDRESS,
+    PAYMENT_ABI,
+    signer
+  );
 
-    const userAddress = await signer.getAddress();
+  const userAddress = await signer.getAddress();
 
-    return { userAddress, ghcContract, paymentContract };
+  return { ghcContract, paymentContract, userAddress };
 }

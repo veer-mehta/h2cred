@@ -11,21 +11,24 @@ const tableStyle = {
   width: '100%',
   borderCollapse: 'collapse',
   boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
-  background: '#fff',
+  background: '#222',
   borderRadius: '12px',
   overflow: 'hidden',
 };
 const thStyle = {
-  background: '#f5f7fa',
-  color: '#333',
-  fontWeight: '600',
+  background: '#222',
+  color: '#fff',
+  fontWeight: '200',
+  fontSize: '1.4rem',
   padding: '14px',
   borderBottom: '1px solid #eaeaea',
 };
 const tdStyle = {
   padding: '12px',
+    color: '#fff',
   textAlign: 'center',
-  borderBottom: '1px solid #f0f0f0',
+  fontSize: '1.2rem',
+  borderBottom: '2px solid #202020',
 };
 const buyBtnStyle = {
   background: 'linear-gradient(90deg,#3b82f6,#06b6d4)',
@@ -51,13 +54,14 @@ const BuyerMarketplace = ({ onBuy }) => {
 
   return (
     <div style={{ margin: '2rem 0', maxWidth: '700px', marginLeft: 'auto', marginRight: 'auto' }}>
-      <h3 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '1.5rem', color: '#2563eb', textAlign: 'center' }}>Marketplace</h3>
+      <h3 style={{ fontSize: '2.5rem', fontWeight: '700', marginBottom: '1.5rem', color: '#2563eb', textAlign: 'center' }}>Marketplace</h3>
+	  
+    	<p style={{fontSize: '1.5rem', color:'white'}}>Price per Credit: {PRICE_PER_CREDIT}</p>
       <table style={tableStyle}>
         <thead>
           <tr>
             <th style={thStyle}>Name</th>
-            <th style={thStyle}>Credits</th>
-            <th style={thStyle}>Price/credit (INR)</th>
+            <th style={thStyle}>Available Credits</th>
             <th style={thStyle}>Amount</th>
             <th style={thStyle}>Buy</th>
           </tr>
@@ -67,7 +71,6 @@ const BuyerMarketplace = ({ onBuy }) => {
             <tr key={seller.id}>
               <td style={tdStyle}>{seller.name}</td>
               <td style={tdStyle}>{seller.credits}</td>
-              <td style={tdStyle}>{PRICE_PER_CREDIT}</td>
               <td style={tdStyle}>
                 <input
                   type="number"
