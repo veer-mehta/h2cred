@@ -22,9 +22,10 @@ const Landing = () => (
         </ul>
       </p>
       <div style={{ margin: '2rem 0', textAlign: 'left', background: '#f0fdf4', borderRadius: '12px', padding: '1.5rem' }}>
-        <strong>Team Members:</strong>
+        <strong>BitBurners</strong><br />
+		<strong>Team Members:</strong>
         <ul style={{ marginTop: '1rem', color: '#059669', fontWeight: 'bold', fontSize: '1.05rem' }}>
-          <li>Veer Mehta</li>
+		  <li>Veer Mehta</li>
           <li>Yash Bhansari</li>
         </ul>
       </div>
