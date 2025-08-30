@@ -8,41 +8,39 @@ const GREEN_HYDROGEN_CONTRACT_ADDRESS =
 const PAYMENT_TOKEN_ADDRESS = "0xa1E0785c5b28D733CB0a0A98d7A8C1C836887bC1"
 
 export const BlockchainProvider = ({ children }) => {
-	const [provider, setProvider] = useState(null)
-	const [signer, setSigner] = useState(null)
-	const [account, setAccount] = useState(null)
-	const [ghcContract, setGhcContract] = useState(null)
-	const [paymentTokenContract, setPaymentTokenContract] = useState(null)
+    const [userAddress, setUserAddress] = useState(null);
+    const [ghcContract, setGhcContract] = useState(null);
+    const [paymentContract, setPaymentContract] = useState(null);
 
-	// useEffect(() => {
-	//     const init = async () => {
-	//         if (window.ethereum) {
-	//             // ethers v6: BrowserProvider
-	//             const ethProvider = new ethers.BrowserProvider(window.ethereum)
-	//             setProvider(ethProvider)
-	//             // Do NOT request accounts automatically
-	//             // Listen for account changes
-	//             window.ethereum.on("accountsChanged", (accounts) => {
-	//                 setAccount(accounts[0] || null)
-	//             })
-	//         } else {
-	//             console.error("Please install MetaMask!")
-	//         }
-	//     }
-	//     init()
-	// }, [])
+    const initContracts = async () => {
+        try {
+            const { userAddress, ghcContract, paymentContract } = await getContracts();
+            setUserAddress(userAddress);
+            setGhcContract(ghcContract);
+            setPaymentContract(paymentContract);
+        } catch (err) {
+            console.error("Failed to connect contracts:", err);
+        }
+    };
 
-	return (
-		<BlockchainContext.Provider
-			value={{
-				provider,
-				signer,
-				account,
-				ghcContract,
-				paymentTokenContract,
-			}}
-		>
-			{children}
-		</BlockchainContext.Provider>
-	)
-}
+    useEffect(() => {
+        initContracts();
+
+        // Listen for account changes
+        if (window.ethereum) {
+            window.ethereum.on("accountsChanged", () => initContracts());
+        }
+    }, []);
+
+    return (
+        <BlockchainContext.Provider
+            value={{
+                userAddress,
+                ghcContract,
+                paymentContract,
+            }}
+        >
+            {children}
+        </BlockchainContext.Provider>
+    );
+};
