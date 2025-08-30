@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
-import contractJson from '../../../blockchain/contracts/HydrogenCredit.sol/HydrogenCredit.json';
+import contractJson from '../../../blockchain/artifacts/contracts/GreenHydrogenCredit.sol/GreenHydrogenCredit.json';
 
-const CONTRACT_ADDRESS = '<DEPLOYED_CONTRACT_ADDRESS>'; // TODO: Replace with actual deployed address
+const CONTRACT_ADDRESS = '<DEPLOYED_CONTRACT_ADDRESS>';
 const ABI = contractJson.abi;
 
 export function getProvider() {
