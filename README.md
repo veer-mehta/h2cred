@@ -1,4 +1,4 @@
-# HydrogenCredit
+# H2Cred
 
 A Solidity-based smart contract project for buying, transferring, and managing hydrogen credits on the Ethereum blockchain. This project uses Hardhat for development, testing, and deployment.
 
@@ -34,7 +34,7 @@ A Solidity-based smart contract project for buying, transferring, and managing h
 
 1. **Clone the repository:**
    ```sh
-   git clone <repo-url>
+   git clone https://github.com/veer-mehta/h2cred.git
    cd h2cred
    ```
 2. **Install dependencies:**
@@ -45,7 +45,7 @@ A Solidity-based smart contract project for buying, transferring, and managing h
    Create a `.env` file in the root directory with:
    ```env
    ALCHEMY_URL=your_sepolia_alchemy_url
-   PRIVATE_KEY=your_sepolia_private_key
+   PRIVATE_KEY=your_metamask_sepolia_private_key
    ```
 
 ## Usage
@@ -62,14 +62,10 @@ npx hardhat test
 
 ### Deploy to Sepolia
 ```sh
-npx hardhat run scripts/deploy.js --network sepolia
+npx hardhat run scripts/deploy.js
 ```
 
 ## Contract Features
 - **Buy Credits:** Users can buy hydrogen credits by sending ETH.
 - **Transfer Credits:** Users can transfer credits to other addresses.
 - **Track Credits:** The contract tracks credits per address.
-
-## License
-
-MIT
