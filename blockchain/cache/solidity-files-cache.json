@@ -569,10 +569,10 @@
         "IERC20Metadata"
       ]
     },
-    "C:\\Users\\veera\\Documents\\projects\\h2cred\\blockchain\\contracts\\MockERC.sol": {
-      "lastModificationDate": 1756570309214,
+    "C:\\Users\\veera\\Documents\\projects\\h2cred\\blockchain\\contracts\\MockERC20.sol": {
+      "lastModificationDate": 1756578424652,
       "contentHash": "5e1a60004da4b18827ecf656607e218d",
-      "sourceName": "contracts/MockERC.sol",
+      "sourceName": "contracts/MockERC20.sol",
       "solcConfig": {
         "version": "0.8.20",
         "settings": {
