@@ -2,8 +2,8 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "C:\\Users\\veera\\Documents\\projects\\h2cred\\blockchain\\contracts\\GreenHydrogenCredit.sol": {
-      "lastModificationDate": 1756542387565,
-      "contentHash": "c4da61d14bdf74e782b913b473cea00a",
+      "lastModificationDate": 1756570431507,
+      "contentHash": "431413884e87ffdaddf5ed22b83a48b4",
       "sourceName": "contracts/GreenHydrogenCredit.sol",
       "solcConfig": {
         "version": "0.8.20",
@@ -32,6 +32,7 @@
       "imports": [
         "@openzeppelin/contracts/token/ERC20/ERC20.sol",
         "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol",
+        "@openzeppelin/contracts/token/ERC20/IERC20.sol",
         "@openzeppelin/contracts/security/Pausable.sol",
         "@openzeppelin/contracts/access/AccessControl.sol",
         "@openzeppelin/contracts/security/ReentrancyGuard.sol"
@@ -566,6 +567,44 @@
       ],
       "artifacts": [
         "IERC20Metadata"
+      ]
+    },
+    "C:\\Users\\veera\\Documents\\projects\\h2cred\\blockchain\\contracts\\MockERC.sol": {
+      "lastModificationDate": 1756570309214,
+      "contentHash": "5e1a60004da4b18827ecf656607e218d",
+      "sourceName": "contracts/MockERC.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "evmVersion": "paris",
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "@openzeppelin/contracts/token/ERC20/ERC20.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "MockERC20"
       ]
     }
   }
