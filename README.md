@@ -1,4 +1,4 @@
-# HydrogenCredit
+# H2Cred
 
 A Solidity-based smart contract project for buying, transferring, and managing hydrogen credits on the Ethereum blockchain. This project uses Hardhat for development, testing, and deployment.
 
