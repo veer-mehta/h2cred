@@ -22,7 +22,7 @@ A Solidity-based smart contract project for buying, transferring, and managing h
 
 1. **Clone the repository:**
    ```sh
-   git clone <repo-url>
+   git clone https://github.com/veer-mehta/h2cred.git
    cd h2cred
    ```
 2. **Install dependencies:**
