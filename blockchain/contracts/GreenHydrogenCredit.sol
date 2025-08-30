@@ -4,14 +4,12 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 contract GreenHydrogenCredit is
     ERC20,
     ERC20Burnable,
-    Pausable,
     AccessControl,
     ReentrancyGuard
 {
@@ -66,17 +64,6 @@ contract GreenHydrogenCredit is
     }
 
     // --------------------------
-    // pause/unpause
-    // --------------------------
-    function pause() public only_admin {
-        _pause();
-    }
-
-    function unpause() public only_admin {
-        _unpause();
-    }
-
-    // --------------------------
     // admin setters
     // --------------------------
     function update_treasury(address new_treasury) public only_admin {
@@ -98,30 +85,25 @@ contract GreenHydrogenCredit is
     // --------------------------
     function buy_tokens(uint256 token_amount)
         public
-        whenNotPaused
         nonReentrant
     {
         require(token_amount > 0, "token_amount > 0");
 
-        // Calculate cost in payment token (USDC, 6 decimals)
         uint256 cost = (token_amount * PRICE_PER_TOKEN) / 1e18;
 
-        // Transfer payment token from buyer to contract
         require(
             payment_token.transferFrom(msg.sender, address(this), cost),
             "payment transfer failed"
         );
 
-        // Mint tokens to buyer
         _mint(msg.sender, token_amount);
-
         emit tokens_purchased(msg.sender, token_amount, cost);
     }
 
     // --------------------------
     // retire tokens (burn)
     // --------------------------
-    function retire_tokens(uint256 token_amount) public whenNotPaused {
+    function retire_tokens(uint256 token_amount) public {
         require(token_amount > 0, "token_amount > 0");
         _burn(msg.sender, token_amount);
         emit tokens_retired(msg.sender, token_amount);
@@ -171,7 +153,7 @@ contract GreenHydrogenCredit is
         address from,
         address to,
         uint256 amount
-    ) internal override(ERC20) whenNotPaused {
+    ) internal override(ERC20) {
         super._beforeTokenTransfer(from, to, amount);
     }
 }

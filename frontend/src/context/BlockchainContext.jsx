@@ -7,15 +7,18 @@ export const BlockchainProvider = ({ children }) => {
     const [userAddress, setUserAddress] = useState(null);
     const [ghcContract, setGhcContract] = useState(null);
     const [paymentContract, setPaymentContract] = useState(null);
+    const [error, setError] = useState(null);
 
     const initContracts = async () => {
         try {
-            const { userAddress, ghcContract, paymentContract } = await getContracts();
-            setUserAddress(userAddress);
+            const { ghcContract, paymentContract, userAddress } = await getContracts();
             setGhcContract(ghcContract);
             setPaymentContract(paymentContract);
+            setUserAddress(userAddress);
+            setError(null);
         } catch (err) {
             console.error("Failed to connect contracts:", err);
+            setError(err.message);
         }
     };
 
@@ -30,11 +33,7 @@ export const BlockchainProvider = ({ children }) => {
 
     return (
         <BlockchainContext.Provider
-            value={{
-                userAddress,
-                ghcContract,
-                paymentContract,
-            }}
+            value={{ userAddress, ghcContract, paymentContract, error }}
         >
             {children}
         </BlockchainContext.Provider>
