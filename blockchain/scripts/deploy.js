@@ -1,8 +1,9 @@
-async function main() 
-{
-    const [deployer] = await ethers.getSigners();
-    console.log("Deploying contracts with account:", deployer.address);
+import { ethers } from "hardhat";
 
+async function main()
+{
+    console.log("Deploying HydrogenCredit contract...");
+	   
     const HydrogenCredit = await ethers.getContractFactory("HydrogenCredit");
     const contract = await HydrogenCredit.deploy();
 
@@ -11,10 +12,10 @@ async function main()
     console.log("HydrogenCredit deployed to:", contract.address);
 }
 
-main().catch((error) => 
+main().catch((error) =>
 {
     console.error(error);
     process.exitCode = 1;
-});
 
+});
 // deploys the smart contract to sepolia testnet with my credentials and some eth to mine the contract
