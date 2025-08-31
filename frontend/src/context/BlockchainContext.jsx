@@ -1,24 +1,25 @@
-import React, { createContext, useState, useEffect } from "react";
-import { getContracts } from "../services/contract";
+import React, { createContext, useEffect, useState } from "react"
+import { ethers } from "ethers"
 
-export const BlockchainContext = createContext();
+export const BlockchainContext = createContext()
+
+const GREEN_HYDROGEN_CONTRACT_ADDRESS =
+	"0xFab90Bf54Ffc1e594174C1a4cf075498904FbFAf"
+const PAYMENT_TOKEN_ADDRESS = "0xa1E0785c5b28D733CB0a0A98d7A8C1C836887bC1"
 
 export const BlockchainProvider = ({ children }) => {
     const [userAddress, setUserAddress] = useState(null);
     const [ghcContract, setGhcContract] = useState(null);
     const [paymentContract, setPaymentContract] = useState(null);
-    const [error, setError] = useState(null);
 
     const initContracts = async () => {
         try {
-            const { ghcContract, paymentContract, userAddress } = await getContracts();
+            const { userAddress, ghcContract, paymentContract } = await getContracts();
+            setUserAddress(userAddress);
             setGhcContract(ghcContract);
             setPaymentContract(paymentContract);
-            setUserAddress(userAddress);
-            setError(null);
         } catch (err) {
             console.error("Failed to connect contracts:", err);
-            setError(err.message);
         }
     };
 
@@ -33,7 +34,11 @@ export const BlockchainProvider = ({ children }) => {
 
     return (
         <BlockchainContext.Provider
-            value={{ userAddress, ghcContract, paymentContract, error }}
+            value={{
+                userAddress,
+                ghcContract,
+                paymentContract,
+            }}
         >
             {children}
         </BlockchainContext.Provider>

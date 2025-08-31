@@ -1,6 +1,8 @@
-import { useContext, useState, useEffect } from "react";
-import { ethers } from "ethers";
-import { BlockchainContext } from "../context/BlockchainContext";
+import { useContext, useState, useEffect } from "react"
+import { ethers } from "ethers"
+import { BlockchainContext } from "../context/BlockchainContext"
+import BuyerMarketplace from "../components/BuyerMarketplace"
+import BuyerCSRConvert from "../components/BuyerCSRConvert"
 
 const BuyerDashboard = () => {
     const { userAddress, ghcContract, paymentContract } = useContext(BlockchainContext);
@@ -8,11 +10,12 @@ const BuyerDashboard = () => {
     const [pricePerToken, setPricePerToken] = useState("1"); // in MERC units
     const [amountToBuy, setAmountToBuy] = useState("1");
 
+	// Load balance on account or contract change
     useEffect(() => {
-        if (ghcContract && userAddress) {
+        if (ghcContract && account) {
             updateBalance();
         }
-    }, [ghcContract, userAddress]);
+    }, [ghcContract, account]);
 
     const updateBalance = async () => {
         try {

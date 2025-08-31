@@ -13,9 +13,9 @@ const SellerIoTSensor = ({ onProduction }) => {
   }, [onProduction]);
 
   return (
-    <div style={{ margin: '2rem 0', background: '#e0f2fe', borderRadius: '12px', padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-      <h3 style={{ color: '#0ea5e9', fontWeight: 'bold', fontSize: '1.2rem' }}>IoT H₂ Generation Sensor</h3>
-      <p style={{ color: '#0369a1', fontWeight: 'bold', fontSize: '1.1rem' }}>Current Production: <b>{production} kg/hr</b></p>
+    <div style={{ margin: '2rem 0', background: '#38b47b', borderRadius: '12px', padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+      <h3 style={{ color: '#181c19', fontWeight: 'bold', fontSize: '1.7rem' }}>IoT H₂ Generation Sensor</h3>
+      <p style={{ color: '#181c19', fontWeight: 'bold', fontSize: '1.5rem' }}>Current Production: <b>{production} kg/hr</b></p>
     </div>
   );
 };
