@@ -1,65 +1,73 @@
-import { useContext, useState, useEffect } from "react"
-import { ethers } from "ethers"
-import { BlockchainContext } from "../context/BlockchainContext"
+import { useContext, useState, useEffect } from "react";
+import { ethers } from "ethers";
+import { BlockchainContext } from "../context/BlockchainContext";
 
 const BuyerDashboard = () => {
-	const { userAddress, ghcContract, paymentContract } =
-		useContext(BlockchainContext)
-	const [balance, setBalance] = useState("0")
+    const { userAddress, ghcContract, paymentContract } = useContext(BlockchainContext);
+    const [ghcBalance, setGhcBalance] = useState("0");
+    const [pricePerToken, setPricePerToken] = useState("1"); // in MERC units
+    const [amountToBuy, setAmountToBuy] = useState("1");
 
-	useEffect(() => {
-		if (ghcContract && userAddress) {
-			updateBalance()
-		}
-	}, [ghcContract, userAddress])
+    useEffect(() => {
+        if (ghcContract && userAddress) {
+            updateBalance();
+        }
+    }, [ghcContract, userAddress]);
 
-	const updateBalance = async () => {
-		try {
-			console.log("Context values:", {
-				userAddress,
-				ghcContract,
-				paymentContract,
-			})
-			const code = await ghcContract.runner.provider.getCode(paymentContract.target)
-			console.log("Payment contract bytecode length:", code.length)
-			const bal = await paymentContract.balanceOf(userAddress)
-			setBalance(ethers.formatUnits(bal, 18))
-		} catch (err) {
-			console.error("Failed to fetch balance:", err)
-		}
-	}
+    const updateBalance = async () => {
+        try {
+            const bal = await ghcContract.balanceOf(userAddress);
+            setGhcBalance(ethers.formatUnits(bal, 18));
+        } catch (err) {
+            console.error("Failed to fetch balance:", err);
+        }
+    };
 
-	const buyToken = async () => {
-		if (!ghcContract || !paymentContract) return
+    const buyGhc = async () => {
+        if (!ghcContract || !paymentContract) return;
+        try {
+            const amount = ethers.parseUnits(amountToBuy || "0", 18);
+            const price = ethers.parseUnits(pricePerToken || "0", 18);
+            const cost = await ghcContract.getGhcCost(amount, price);
 
-		try {
-			const tokenAmount = ethers.parseUnits("1", 18)
-			const cost = await ghcContract.get_cost_for_tokens(tokenAmount)
+            // Approve GHC contract to spend MERC
+            const approveTx = await paymentContract.approve(ghcContract.target, cost);
+            await approveTx.wait();
 
-			const approveTx = await paymentContract.approve(
-				ghcContract.target,
-				cost
-			)
-			await approveTx.wait()
+            // Call buyFromSeller (assuming seller is admin for testing)
+            const admin = await ghcContract.getRoleMember(ethers.id("NGO_ROLE"), 0);
+            const buyTx = await ghcContract.buyFromSeller(admin, amount, price);
+            await buyTx.wait();
 
-			const buyTx = await ghcContract.buy_tokens(tokenAmount)
-			await buyTx.wait()
+            updateBalance();
+        } catch (err) {
+            console.error("Buy GHC failed:", err);
+        }
+    };
 
-			updateBalance()
-		} catch (err) {
-			console.error("Buy token failed:", err)
-		}
-	}
+    return (
+        <div style={{ padding: "2rem" }}>
+            <h1>Buyer Dashboard</h1>
+            <p>Connected account: {userAddress || "Not connected"}</p>
+            <p>GHC Balance: {ghcBalance}</p>
 
-	return (
-		<div style={{ padding: "2rem" }}>
-			<h1>Buyer Dashboard</h1>
-			<p>Connected account: {userAddress || "Not connected"}</p>
-			<p>GHC Balance: {balance}</p>
-			<button onClick={buyToken}>Buy 1 Token</button>
-			<button onClick={updateBalance}>Refresh Balance</button>
-		</div>
-	)
-}
+            <input
+                type="number"
+                placeholder="Amount to buy"
+                value={amountToBuy}
+                onChange={(e) => setAmountToBuy(e.target.value)}
+            />
+            <input
+                type="number"
+                placeholder="Price per token"
+                value={pricePerToken}
+                onChange={(e) => setPricePerToken(e.target.value)}
+                style={{ marginLeft: "0.5rem" }}
+            />
+            <button onClick={buyGhc} style={{ marginLeft: "0.5rem" }}>Buy GHC</button>
+            <button onClick={updateBalance} style={{ marginLeft: "0.5rem" }}>Refresh Balance</button>
+        </div>
+    );
+};
 
-export default BuyerDashboard
+export default BuyerDashboard;

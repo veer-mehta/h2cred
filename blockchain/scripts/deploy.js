@@ -12,34 +12,34 @@ async function main()
 
     console.log("Deploying contracts with wallet:", deployer.address);
 
-    // --- Deploy MockERC20 ---
-    const mockERCArtifact = await hre.artifacts.readArtifact("MockERC20");
-    const MockERCFactory = new ethers.ContractFactory(
-        mockERCArtifact.abi,
-        mockERCArtifact.bytecode,
+    // --- Deploy MockERC20 (SAFE) ---
+    const mockERC20Artifact = await hre.artifacts.readArtifact("MockERC20");
+    const MockERC20Factory = new ethers.ContractFactory(
+        mockERC20Artifact.abi,
+        mockERC20Artifact.bytecode,
         deployer
     );
 
-    const initialSupply = ethers.parseUnits("1000000", 6n);
-    const mockERC = await MockERCFactory.deploy("Mock USDC", "mUSDC", 6, initialSupply);
-    await mockERC.waitForDeployment();
-    console.log("MockERC20 deployed at:", await mockERC.getAddress());
+    const mockERC20 = await MockERC20Factory.deploy(deployer.address);
+    await mockERC20.waitForDeployment();
+    console.log("MockERC20 deployed at:", mockERC20.target);
 
-    // --- Deploy GreenHydrogenCredit ---
+    // --- Deploy GreenHydrogenCredit (GHC) ---
     const ghcArtifact = await hre.artifacts.readArtifact("GreenHydrogenCredit");
-    const GHCFatory = new ethers.ContractFactory(
+    const GHContractFactory = new ethers.ContractFactory(
         ghcArtifact.abi,
         ghcArtifact.bytecode,
         deployer
     );
 
-    const admin = deployer.address;
-    const treasury = deployer.address;
-    const paymentTokenAddress = await mockERC.getAddress();
+    // Only payment token address is needed now
+    const ghc = await GHContractFactory.deploy(mockERC20.target);
+    await ghc.waitForDeployment();
+    console.log("GreenHydrogenCredit deployed at:", ghc.target);
 
-    const ght = await GHCFatory.deploy(admin, treasury, paymentTokenAddress);
-    await ght.waitForDeployment();
-    console.log("GreenHydrogenCredit deployed at:", await ght.getAddress());
+    console.log("\nDeployment complete!");
+    console.log("MockERC20 (SAFE) address:", mockERC20.target);
+    console.log("GreenHydrogenCredit (GHC) address:", ghc.target);
 }
 
 main().catch((err) => {

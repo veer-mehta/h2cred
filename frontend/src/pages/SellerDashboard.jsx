@@ -1,43 +1,149 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { disconnectWallet } from '../blockchain/disconnect';
-import SellerIoTSensor from '../components/SellerIoTSensor';
-import SellerQAForm from '../components/SellerQAForm';
+import { useContext, useState, useEffect } from "react";
+import { ethers } from "ethers";
+import { BlockchainContext } from "../context/BlockchainContext";
 
 const SellerDashboard = () => {
-  const [credits, setCredits] = useState(0);
-  const [qaPassed, setQAPassed] = useState(false);
-  const navigate = useNavigate();
+    const { userAddress, ghcContract, paymentContract } = useContext(BlockchainContext);
+    const [mercBalance, setMercBalance] = useState("0");
+    const [ghcBalance, setGhcBalance] = useState("0");
+    const [mintAmount, setMintAmount] = useState("0");
+    const [error, setError] = useState(null);
+    const [loading, setLoading] = useState(false);
 
-  const handleProduction = (amount) => {
-    setCredits(prev => prev + Math.floor(amount));
-  };
+    useEffect(() => {
+        if (paymentContract && ghcContract && userAddress) {
+            refreshBalances();
+        }
+    }, [paymentContract, ghcContract, userAddress]);
 
-  const handleQACheck = (passed) => {
-    setQAPassed(passed);
-  };
+    const refreshBalances = async () => {
+        try {
+            setLoading(true);
+            console.log("Refreshing balances...");
+            
+            // Check if contracts are properly connected
+            console.log("Payment contract:", paymentContract);
+            console.log("GHC contract:", ghcContract);
+            
+            const mercBal = await paymentContract.balanceOf(userAddress);
+            console.log("Raw MERC balance:", mercBal.toString());
+            setMercBalance(ethers.formatUnits(mercBal, 18));
 
-  const handleLogout = async () => {
-    await disconnectWallet();
-    alert('For full security, please disconnect your wallet from Metamask manually.');
-    navigate('/');
-  };
+            const ghcBal = await ghcContract.balanceOf(userAddress);
+            console.log("Raw GHC balance:", ghcBal.toString());
+            setGhcBalance(ethers.formatUnits(ghcBal, 18));
+            
+        } catch (err) {
+            console.error("Failed to fetch balances:", err);
+            setError("Balance fetch failed: " + err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
-  return (
-    <div style={{ padding: '2rem', maxWidth: '700px', margin: '0 auto', background: 'linear-gradient(120deg,#e0fdf4 0%,#bbf7d0 100%)' }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
-        <button style={{ background: 'linear-gradient(90deg,#059669,#10b981)', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.7rem 1.5rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }} onClick={handleLogout}>Logout</button>
-      </div>
-      <h2 style={{ fontSize: '2rem', fontWeight: '700', color: '#059669', textAlign: 'center', marginBottom: '1rem' }}>Seller Dashboard</h2>
-      <p style={{ textAlign: 'center', color: '#444', marginBottom: '2rem' }}>Generate credits, pass QA checks, transfer credits to buyers.</p>
-      <div style={{ background: '#f0fdf4', borderRadius: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.07)', padding: '2rem' }}>
-        <SellerIoTSensor onProduction={handleProduction} />
-        <p style={{ fontSize: '1.2rem', color: '#059669', fontWeight: 'bold', margin: '1rem 0' }}>Total Credits: {credits}</p>
-        <SellerQAForm onCheck={handleQACheck} />
-        <p style={{ fontWeight: 'bold', color: qaPassed ? '#059669' : '#ef4444', marginTop: '1rem' }}>QA Status: {qaPassed ? 'Passed' : 'Not Passed'}</p>
-      </div>
-    </div>
-  );
+    const mintMerc = async () => {
+        if (!paymentContract) {
+            setError("Payment contract not connected");
+            return;
+        }
+        try {
+            setLoading(true);
+            const amount = ethers.parseUnits(mintAmount || "0", 18);
+            console.log("Minting MERC:", amount.toString());
+            
+            const tx = await paymentContract.mint(userAddress, amount);
+            console.log("MERC mint transaction:", tx.hash);
+            
+            await tx.wait();
+            console.log("MERC mint successful");
+            
+            refreshBalances();
+            setError(null);
+        } catch (err) {
+            console.error("Mint MERC failed:", err);
+            setError("Mint MERC failed: " + err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const mintGHC = async () => {
+        if (!ghcContract) {
+            setError("GHC contract not connected");
+            return;
+        }
+        try {
+            setLoading(true);
+            const amount = ethers.parseUnits(mintAmount || "0", 18);
+            console.log("Minting GHC:", amount.toString());
+            
+            // FIX: Use the correct function name mintGHC instead of mint
+            const tx = await ghcContract.mintGHC(amount);
+            console.log("GHC mint transaction:", tx.hash);
+            
+            await tx.wait();
+            console.log("GHC mint successful");
+            
+            refreshBalances();
+            setError(null);
+        } catch (err) {
+            console.error("Mint GHC failed:", err);
+            setError("Mint GHC failed: " + err.message);
+            
+            // Check if the function exists
+            if (err.message.includes("mintGHC")) {
+                setError("mintGHC function not found. Check contract ABI.");
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div style={{ padding: "2rem" }}>
+            <h1>Seller Dashboard (Minter)</h1>
+            <p>Connected account: {userAddress || "Not connected"}</p>
+            <p>MERC Balance: {mercBalance}</p>
+            <p>GHC Balance: {ghcBalance}</p>
+
+            {error && <p style={{ color: "red" }}>{error}</p>}
+            {loading && <p>Loading...</p>}
+
+            <div style={{ marginTop: "1rem" }}>
+                <input
+                    type="number"
+                    placeholder="Amount to mint"
+                    value={mintAmount}
+                    onChange={(e) => setMintAmount(e.target.value)}
+                />
+                <button onClick={mintMerc} disabled={loading} style={{ marginLeft: "0.5rem" }}>
+                    Mint MERC
+                </button>
+                <button onClick={mintGHC} disabled={loading} style={{ marginLeft: "0.5rem" }}>
+                    Mint GHC
+                </button>
+            </div>
+
+            <div style={{ marginTop: "1rem" }}>
+                <button onClick={refreshBalances} disabled={loading}>
+                    Refresh Balances
+                </button>
+            </div>
+
+            {/* Debug info */}
+            <div style={{ marginTop: "2rem", padding: "1rem", background: "#f0f0f0" }}>
+                <h3>Debug Info:</h3>
+                <p>GHC Contract: {ghcContract?.address}</p>
+                <p>Payment Contract: {paymentContract?.address}</p>
+                <button onClick={() => console.log("GHC Contract:", ghcContract)}>
+                    Log GHC Contract
+                </button>
+                <button onClick={() => console.log("Payment Contract:", paymentContract)}>
+                    Log Payment Contract
+                </button>
+            </div>
+        </div>
+    );
 };
 
 export default SellerDashboard;

@@ -1,8 +1,8 @@
 import { ethers } from "ethers"
 
 // deployed contract addresses
-const GHC_ADDRESS = "0xB7E83a480870cB0283DF393264dc5b62adbFCd0D"
-const PAYMENT_TOKEN_ADDRESS = "0x5ef42e1F3Cd7eeA6Fb81fdcBD96b1D73172AEe85"
+const GHC_ADDRESS = "0xAC8a7765b289dF709711A724a55F33cc29a017B8"
+const PAYMENT_TOKEN_ADDRESS = "0xb710e583cA24Ef923d950ef031e6a698D3097FBb"
 
 // import the ABI JSONs from Hardhat build artifacts
 import GHCArtifact from "../../../blockchain/artifacts/contracts/GreenHydrogenCredit.sol/GreenHydrogenCredit.json"
@@ -20,6 +20,7 @@ export async function getContracts() {
 		GHCArtifact.abi,
 		signer
 	)
+
 	const paymentContract = new ethers.Contract(
 		PAYMENT_TOKEN_ADDRESS,
 		PaymentArtifact.abi,
