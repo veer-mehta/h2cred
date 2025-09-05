@@ -1,11 +1,17 @@
-import "@nomicfoundation/hardhat-ethers"
+import "@nomicfoundation/hardhat-toolbox"
 import dotenv from "dotenv"
-
 dotenv.config()
 
-export default {
+const config = {
 	defaultNetwork: "sepolia",
-	solidity: "0.8.20",
+	solidity: {
+		version: "0.8.27",
+		settings: {
+			optimizer: {
+				enabled: true,
+			},
+		},
+	},
 	networks: {
 		sepolia: {
 			type: "http",
@@ -15,3 +21,5 @@ export default {
 		},
 	},
 }
+
+export default config

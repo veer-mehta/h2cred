@@ -1,58 +1,45 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+// Compatible with OpenZeppelin Contracts ^5.4.0
+pragma solidity ^0.8.27;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC20Burnable} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import {ERC20Pausable} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Pausable.sol";
+import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 
-contract GreenHydrogenCredit is ERC20, ERC20Burnable, ReentrancyGuard
-{
-    IERC20 public immutable paymentToken;
+/// @custom:security-contact veeramehta09@gmail.com
+contract GreenHydrogenCredit is ERC20, ERC20Burnable, ERC20Pausable, AccessControl, ERC20Permit {
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
-    event tokens_minted(address indexed minter, uint256 amount);
-    event tokens_sold(
-        address indexed buyer,
-        address indexed seller,
-        uint256 amount,
-        uint256 cost
-    );
-
-    constructor(address paymentTokenAddress) ERC20("GreenHydrogenCredit", "GHC") {
-        require(paymentTokenAddress != address(0), "payment token zero");
-        paymentToken = IERC20(paymentTokenAddress);
+    constructor(address defaultAdmin, address pauser, address minter)
+        ERC20("GreenHydrogenCredit", "GHC")
+        ERC20Permit("GreenHydrogenCredit")
+    {
+        _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin);
+        _grantRole(PAUSER_ROLE, pauser);
+        _grantRole(MINTER_ROLE, minter);
     }
 
-    // Minting is now open to anyone
-    function mintGHC(uint256 amount) public {
-        require(amount > 0, "amount > 0");
-        _mint(msg.sender, amount);
-        emit tokens_minted(msg.sender, amount);
+    function pause() public onlyRole(PAUSER_ROLE) {
+        _pause();
     }
 
-    // Peer-to-peer sale
-    function buyFromSeller(address seller, uint256 amount, uint256 pricePerToken) public nonReentrant {
-        require(seller != address(0), "seller zero");
-        require(amount > 0, "amount > 0");
-        require(balanceOf(seller) >= amount, "seller balance low");
-
-        uint256 cost = amount * pricePerToken;
-
-        // Transfer payment token from buyer to seller
-        require(paymentToken.transferFrom(msg.sender, seller, cost), "payment failed");
-
-        // Transfer GHC from seller to buyer
-        _transfer(seller, msg.sender, amount);
-
-        emit tokens_sold(msg.sender, seller, amount, cost);
+    function unpause() public onlyRole(PAUSER_ROLE) {
+        _unpause();
     }
 
-    function getGhcCost(uint256 amount, uint256 pricePerToken) public pure returns (uint256) {
-        return amount * pricePerToken;
+    function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
+        _mint(to, amount);
     }
 
-    // Optional override
-    function _beforeTokenTransfer(address from, address to, uint256 amount) internal override(ERC20) {
-        super._beforeTokenTransfer(from, to, amount);
+    // The following functions are overrides required by Solidity.
+
+    function _update(address from, address to, uint256 value)
+        internal
+        override(ERC20, ERC20Pausable)
+    {
+        super._update(from, to, value);
     }
 }
