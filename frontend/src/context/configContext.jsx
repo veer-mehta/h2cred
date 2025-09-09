@@ -1,8 +1,7 @@
 import { createContext, useContext } from "react";
-import contractArtifact from "../../artifacts/contracts/GreenHydrogenCredit.sol/GreenHydrogenCredit.json";
+import {abi} from "../../artifacts/contracts/GreenHydrogenCredit.sol/GreenHydrogenCredit.json";
 
 const ConfigContext = createContext(null);
-const abi = contractArtifact.abi;
 
 export function ConfigProvider({ children }) {
   const config = {
