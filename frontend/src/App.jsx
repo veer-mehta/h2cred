@@ -55,6 +55,14 @@ export default function App() {
     query: { enabled: !!contractAddress },
   })
 
+  const { data: recipientBalance, refetch: refetchRecipient } = useReadContract({
+    address: contractAddress,
+    abi,
+    functionName: "balanceOf",
+    args: [recipient],
+    query: { enabled: isAddress(recipient) },
+  })
+
   const handleMint = async () => {
     try {
       const txHash = await writeContractAsync({
@@ -64,7 +72,8 @@ export default function App() {
   args: [address, parseUnits(String(amount || 0), Number(decimals ?? 18))],
       })
       setHash(txHash)
-      refetch()
+  refetch()
+  if (refetchRecipient) refetchRecipient()
     } catch (err) {
       console.error(err)
     }
@@ -79,7 +88,8 @@ export default function App() {
   args: [parseUnits(String(amount || 0), Number(decimals ?? 18))],
       })
       setHash(txHash)
-      refetch()
+  refetch()
+  if (refetchRecipient) refetchRecipient()
     } catch (err) {
       console.error(err)
     }
@@ -223,7 +233,7 @@ export default function App() {
               <div className="flex gap-2">
                 <button
                   onClick={handleTransfer}
-                  disabled={!recipient || !recipient.startsWith('0x') || !transferAmount}
+                  disabled={!isAddress(recipient) || !transferAmount}
                   className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold shadow hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                   Transfer by Address
@@ -237,6 +247,11 @@ export default function App() {
                 </button>
               </div>
             </div>
+            {isAddress(recipient) && (
+              <p className="text-xs text-gray-600 mt-2">
+                Recipient on-chain balance: {typeof recipientBalance === 'bigint' ? formatUnits(recipientBalance, Number(decimals ?? 18)) : '—'}
+              </p>
+            )}
             {bookCid && (
               <p className="text-xs text-gray-500 mt-2 break-all">Company book CID: {bookCid}</p>
             )}
