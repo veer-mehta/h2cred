@@ -38,13 +38,12 @@ export default function App() {
     hash,
   })
 
-  // ✅ Call the hook directly (not inside useEffect)
   const { data: balance, refetch } = useReadContract({
     address: contractAddress,
     abi,
     functionName: "balanceOf",
     args: [address],
-    query: { enabled: !!address }, // only run if address exists
+    query: { enabled: !!address },
   })
 
   const handleMint = async () => {
@@ -56,7 +55,7 @@ export default function App() {
         args: [address, BigInt(amount)],
       })
       setHash(txHash)
-      refetch() // refresh balance
+      refetch()
     } catch (err) {
       console.error(err)
     }
@@ -71,7 +70,7 @@ export default function App() {
         args: [BigInt(amount)],
       })
       setHash(txHash)
-      refetch() // refresh balance
+      refetch()
     } catch (err) {
       console.error(err)
     }
@@ -86,7 +85,7 @@ export default function App() {
         args: [recipient, BigInt(transferAmount)],
       })
       setHash(txHash)
-      refetch() // refresh balance
+      refetch()
     } catch (err) {
       console.error(err)
     }
