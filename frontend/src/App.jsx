@@ -14,6 +14,8 @@ export default function App() {
   const { writeContractAsync } = useWriteContract()
 
   const [amount, setAmount] = useState("")
+  const [recipient, setRecipient] = useState("")
+  const [transferAmount, setTransferAmount] = useState("")
   const [hash, setHash] = useState(null)
 
   const { isLoading, isSuccess, isError } = useWaitForTransactionReceipt({
@@ -59,6 +61,21 @@ export default function App() {
     }
   }
 
+  const handleTransfer = async () => {
+    try {
+      const txHash = await writeContractAsync({
+        address: contractAddress,
+        abi,
+        functionName: "transfer",
+        args: [recipient, BigInt(transferAmount)],
+      })
+      setHash(txHash)
+      refetch() // refresh balance
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-100 via-white to-green-200 flex flex-col items-center py-10">
       {/* Header */}
@@ -70,7 +87,7 @@ export default function App() {
       </header>
 
       {isConnected ? (
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 flex flex-col gap-6">
+  <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 flex flex-col gap-6">
           {/* Balance */}
           <div className="text-center">
             <h3 className="text-lg font-semibold text-gray-700">Your Balance</h3>
@@ -104,6 +121,34 @@ export default function App() {
             >
               Burn
             </button>
+          </div>
+
+          {/* Transfer */}
+          <div className="border-t pt-4">
+            <h3 className="text-lg font-semibold text-gray-700 mb-2">Transfer Credits</h3>
+            <input
+              type="text"
+              placeholder="Recipient address (0x...)"
+              value={recipient}
+              onChange={(e) => setRecipient(e.target.value.trim())}
+              className="w-full mb-3 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
+            />
+            <div className="flex gap-3">
+              <input
+                type="number"
+                placeholder="Amount"
+                value={transferAmount}
+                onChange={(e) => setTransferAmount(e.target.value)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
+              />
+              <button
+                onClick={handleTransfer}
+                disabled={!recipient || !transferAmount}
+                className="px-6 py-2 rounded-lg bg-blue-600 text-white font-semibold shadow hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                Transfer
+              </button>
+            </div>
           </div>
 
           {/* Transaction status */}

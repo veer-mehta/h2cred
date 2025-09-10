@@ -7,7 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import App from "./App";
 import { ConfigProvider, useAppConfig } from "./context/configContext";
-
+import "./index.css";
 import "@rainbow-me/rainbowkit/styles.css";
 
 function Providers({ children }) {
