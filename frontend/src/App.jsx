@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
+import { parseUnits, formatUnits, isAddress } from "viem"
 import {
   useAccount,
   useWriteContract,
@@ -46,13 +47,21 @@ export default function App() {
     query: { enabled: !!address },
   })
 
+  const { data: decimals } = useReadContract({
+    address: contractAddress,
+    abi,
+    functionName: "decimals",
+    args: [],
+    query: { enabled: !!contractAddress },
+  })
+
   const handleMint = async () => {
     try {
       const txHash = await writeContractAsync({
         address: contractAddress,
         abi,
         functionName: "mint",
-        args: [address, BigInt(amount)],
+  args: [address, parseUnits(String(amount || 0), Number(decimals ?? 18))],
       })
       setHash(txHash)
       refetch()
@@ -67,7 +76,7 @@ export default function App() {
         address: contractAddress,
         abi,
         functionName: "burn",
-        args: [BigInt(amount)],
+  args: [parseUnits(String(amount || 0), Number(decimals ?? 18))],
       })
       setHash(txHash)
       refetch()
@@ -78,11 +87,12 @@ export default function App() {
 
   const handleTransfer = async () => {
     try {
+      if (!isAddress(recipient)) throw new Error("Invalid recipient address")
       const txHash = await writeContractAsync({
         address: contractAddress,
         abi,
         functionName: "transfer",
-        args: [recipient, BigInt(transferAmount)],
+        args: [recipient, parseUnits(String(transferAmount || 0), Number(decimals ?? 18))],
       })
       setHash(txHash)
       refetch()
@@ -95,14 +105,34 @@ export default function App() {
     try {
       const addr = resolveName(book, recipient)
       if (!addr) throw new Error("Unknown company name")
+      if (!isAddress(addr)) throw new Error("Resolved address is invalid")
       const txHash = await writeContractAsync({
         address: contractAddress,
         abi,
         functionName: "transfer",
-        args: [addr, BigInt(transferAmount)],
+        args: [addr, parseUnits(String(transferAmount || 0), Number(decimals ?? 18))],
       })
       setHash(txHash)
       refetch()
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const handleWatchAsset = async () => {
+    try {
+      if (!window?.ethereum) return
+      await window.ethereum.request({
+        method: 'wallet_watchAsset',
+        params: {
+          type: 'ERC20',
+          options: {
+            address: contractAddress,
+            symbol: 'GHC',
+            decimals: Number(decimals ?? 18),
+          },
+        },
+      })
     } catch (err) {
       console.error(err)
     }
@@ -129,7 +159,10 @@ export default function App() {
         <h2 className="text-xl font-bold text-green-700">
           🌱 Green Hydrogen Credit
         </h2>
-        <ConnectButton />
+        <div className="flex items-center gap-3">
+          <button onClick={handleWatchAsset} className="px-3 py-1.5 text-sm rounded-md bg-emerald-600 text-white hover:bg-emerald-700">Add GHC to Wallet</button>
+          <ConnectButton />
+        </div>
       </header>
 
       {isConnected ? (
@@ -138,7 +171,7 @@ export default function App() {
           <div className="text-center">
             <h3 className="text-lg font-semibold text-gray-700">Your Balance</h3>
             <p className="text-3xl font-bold text-green-600 mt-2">
-              {balance ? Number(balance) : 0}
+              {typeof balance === 'bigint' ? formatUnits(balance, Number(decimals ?? 18)) : (balance ?? 0)}
             </p>
           </div>
 
