@@ -3,7 +3,7 @@
 
 A full-stack dApp for buying, transferring, and managing hydrogen credits on the Ethereum blockchain. The backend uses Solidity smart contracts with Hardhat, and the frontend is built with React + Vite.
 
-## Screenshots
+<!-- ## Screenshots
 
 ### Landing Page
 ![Landing Page](media/landing_page.png)
@@ -13,7 +13,7 @@ A full-stack dApp for buying, transferring, and managing hydrogen credits on the
 
 ### Buyer Dashboard
 ![Buyer Dashboard](media/buyer_dashboard.png)
-
+-->
 
 
 ## Project Structure
