@@ -1,1 +1,150 @@
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-font-smoothing: antialiased; overflow-y: scroll; }
+  body {
+    background: #0a0a0a;
+    color: #d1d5db;
+    font-family: 'Inter', system-ui, sans-serif;
+    min-height: 100vh;
+  }
+  #root { width: 100%; min-height: 100vh; }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: #0a0a0a; }
+  ::-webkit-scrollbar-thumb { background: #1f1f1f; border-radius: 2px; }
+}
+
+@layer components {
+  /* Cards */
+  .card {
+    background: #111111;
+    border: 1px solid #1c1c1c;
+    border-radius: 12px;
+  }
+  .card-inner {
+    background: #0d0d0d;
+    border: 1px solid #1a1a1a;
+    border-radius: 8px;
+  }
+
+  /* Buttons */
+  .btn-primary {
+    background: #e5e7eb;
+    color: #0a0a0a;
+    font-weight: 600;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s, opacity 0.15s;
+  }
+  .btn-primary:hover { background: #f3f4f6; }
+  .btn-primary:active { opacity: 0.85; }
+  .btn-primary:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .btn-ghost {
+    background: transparent;
+    color: #6b7280;
+    font-weight: 500;
+    border-radius: 8px;
+    border: 1px solid #1c1c1c;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .btn-ghost:hover { border-color: #2a2a2a; color: #d1d5db; background: #111111; }
+  .btn-ghost:active { opacity: 0.8; }
+
+  .btn-danger {
+    background: #1a0a0a;
+    color: #f87171;
+    font-weight: 600;
+    border-radius: 8px;
+    border: 1px solid #2a1010;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-danger:hover { background: #200c0c; }
+  .btn-danger:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .btn-success {
+    background: #0a180a;
+    color: #4ade80;
+    font-weight: 600;
+    border-radius: 8px;
+    border: 1px solid #0e2a0e;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-success:hover { background: #0c1e0c; }
+  .btn-success:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* Input */
+  .input-field {
+    width: 100%;
+    background: #0a0a0a;
+    border: 1px solid #1c1c1c;
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: #e5e7eb;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8125rem;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .input-field::placeholder { color: #3a3a3a; }
+  .input-field:focus { border-color: #2d2d2d; }
+
+  /* Hide native number input spinners */
+  .input-field[type="number"]::-webkit-inner-spin-button,
+  .input-field[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; appearance: none; margin: 0; }
+  .input-field[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+
+  /* Label */
+  .field-label {
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  /* Mono numbers */
+  .mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-feature-settings: 'tnum';
+    letter-spacing: -0.01em;
+  }
+
+  /* Divider */
+  .divider { border: none; border-top: 1px solid #1a1a1a; }
+
+  /* Badge */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+  .badge-green { color: #4ade80; background: #0a1a0a; border: 1px solid #0e2a0e; }
+  .badge-blue  { color: #60a5fa; background: #0a0f1a; border: 1px solid #0e162a; }
+  .badge-red   { color: #f87171; background: #1a0a0a; border: 1px solid #2a0e0e; }
+  .badge-gray  { color: #6b7280; background: #111111; border: 1px solid #1c1c1c; }
+  .badge-amber { color: #fbbf24; background: #171005; border: 1px solid #241900; }
+
+  /* Animations */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes slide-up { from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  @keyframes slide-down { from { transform: translateY(0); opacity: 1; } to { transform: translateY(12px); opacity: 0; } }
+
+  .animate-spin-slow { animation: spin 1.5s linear infinite; }
+  .animate-slide-up { animation: slide-up 0.2s ease-out; }
+}

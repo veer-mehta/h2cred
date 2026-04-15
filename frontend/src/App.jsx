@@ -1,308 +1,174 @@
-import { useEffect, useMemo, useState } from "react"
-import { parseUnits, formatUnits, isAddress } from "viem"
-import {
-  useAccount,
-  useWriteContract,
-  useWaitForTransactionReceipt,
-  useReadContract,
-} from "wagmi"
-import { ConnectButton } from "@rainbow-me/rainbowkit"
-import { useAppConfig } from "./context/configContext"
-import { getW3Client, fetchBookByCid, resolveName, upsertEntry, putBook } from "./lib/companyBook"
+import { useState, useEffect, useRef } from 'react';
+import './index.css';
+import Navbar        from './components/Navbar';
+import TabBar        from './components/TabBar';
+import OverviewTab   from './components/OverviewTab';
+import TransferTab   from './components/TransferTab';
+import AdminTab      from './components/AdminTab';
+import MarketplaceTab from './components/MarketplaceTab';
+import ToastWidget   from './components/ToastWidget';
+import WalletModal   from './components/WalletModal';
+import { useWallet } from './hooks/useWallet';
 
 export default function App() {
-  const config = useAppConfig()
-  const { contractAddress, abi } = config
-  const { address, isConnected } = useAccount()
-  const { writeContractAsync } = useWriteContract()
+  const [activeTab, setActiveTab] = useState('overview');
+  const [toast, setToast]         = useState({ status: null, message: '', txHash: '' });
+  const [modalOpen, setModalOpen] = useState(false);
+  const [accountName, setAccountName] = useState(null);
 
-  const [amount, setAmount] = useState("")
-  const [recipient, setRecipient] = useState("")
-  const [transferAmount, setTransferAmount] = useState("")
-  const [hash, setHash] = useState(null)
-  const [book, setBook] = useState({ entries: {}, updatedAt: new Date().toISOString() })
-  const [bookCid, setBookCid] = useState("")
-  const [newCompanyName, setNewCompanyName] = useState("")
-  const [newCompanyAddress, setNewCompanyAddress] = useState("")
-  const w3client = useMemo(() => getW3Client(config?.ipfs?.web3StorageToken), [config?.ipfs?.web3StorageToken])
+  const wallet = useWallet();
+  const prevAccount = useRef(null);
 
   useEffect(() => {
-    const cid = config?.ipfs?.initialCompanyBookCid
-    setBookCid(cid || "")
-    if (!cid) return
-    fetchBookByCid(cid)
-      .then(setBook)
-      .catch((e) => console.warn("Failed to load company book", e))
-  }, [config?.ipfs?.initialCompanyBookCid])
-
-  const { isLoading, isSuccess, isError } = useWaitForTransactionReceipt({
-    hash,
-  })
-
-  const { data: balance, refetch } = useReadContract({
-    address: contractAddress,
-    abi,
-    functionName: "balanceOf",
-    args: [address],
-    query: { enabled: !!address },
-  })
-
-  const { data: decimals } = useReadContract({
-    address: contractAddress,
-    abi,
-    functionName: "decimals",
-    args: [],
-    query: { enabled: !!contractAddress },
-  })
-
-  const { data: recipientBalance, refetch: refetchRecipient } = useReadContract({
-    address: contractAddress,
-    abi,
-    functionName: "balanceOf",
-    args: [recipient],
-    query: { enabled: isAddress(recipient) },
-  })
-
-  const handleMint = async () => {
-    try {
-      const txHash = await writeContractAsync({
-        address: contractAddress,
-        abi,
-        functionName: "mint",
-  args: [address, parseUnits(String(amount || 0), Number(decimals ?? 18))],
-      })
-      setHash(txHash)
-  refetch()
-  if (refetchRecipient) refetchRecipient()
-    } catch (err) {
-      console.error(err)
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    if (tab === 'marketplace') {
+      setActiveTab('marketplace');
     }
-  }
+  }, []);
 
-  const handleBurn = async () => {
-    try {
-      const txHash = await writeContractAsync({
-        address: contractAddress,
-        abi,
-        functionName: "burn",
-  args: [parseUnits(String(amount || 0), Number(decimals ?? 18))],
-      })
-      setHash(txHash)
-  refetch()
-  if (refetchRecipient) refetchRecipient()
-    } catch (err) {
-      console.error(err)
-    }
-  }
+  // Resolve connected wallet to a registered company name
+  useEffect(() => {
+    if (!wallet.account) { setAccountName(null); return; }
+    (async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/registry');
+        if (!res.ok) {
+          throw new Error(`Registry request failed with ${res.status}`);
+        }
+        const data = await res.json();
+        if (!Array.isArray(data)) {
+          throw new Error('Registry response was not a list.');
+        }
+        const match = data.find(c => c.address.toLowerCase() === wallet.account.toLowerCase());
+        setAccountName(match ? match.name : null);
+      } catch (e) {
+        console.error('Failed to resolve account name:', e);
+        setAccountName(null);
+      }
+    })();
+  }, [wallet.account]);
 
-  const handleTransfer = async () => {
-    try {
-      if (!isAddress(recipient)) throw new Error("Invalid recipient address")
-      const txHash = await writeContractAsync({
-        address: contractAddress,
-        abi,
-        functionName: "transfer",
-        args: [recipient, parseUnits(String(transferAmount || 0), Number(decimals ?? 18))],
-      })
-      setHash(txHash)
-      refetch()
-    } catch (err) {
-      console.error(err)
-    }
-  }
+  const showToast = (status, message, txHash = '') =>
+    setToast({ status, message, txHash });
 
-  const handleTransferByName = async () => {
-    try {
-      const addr = resolveName(book, recipient)
-      if (!addr) throw new Error("Unknown company name")
-      if (!isAddress(addr)) throw new Error("Resolved address is invalid")
-      const txHash = await writeContractAsync({
-        address: contractAddress,
-        abi,
-        functionName: "transfer",
-        args: [addr, parseUnits(String(transferAmount || 0), Number(decimals ?? 18))],
-      })
-      setHash(txHash)
-      refetch()
-    } catch (err) {
-      console.error(err)
-    }
-  }
+  const clearToast = () =>
+    setToast({ status: null, message: '', txHash: '' });
 
-  const handleWatchAsset = async () => {
-    try {
-      if (!window?.ethereum) return
-      await window.ethereum.request({
-        method: 'wallet_watchAsset',
-        params: {
-          type: 'ERC20',
-          options: {
-            address: contractAddress,
-            symbol: 'GHC',
-            decimals: Number(decimals ?? 18),
-          },
-        },
-      })
-    } catch (err) {
-      console.error(err)
+  // Close modal and toast on successful connection
+  useEffect(() => {
+    if (wallet.account && !prevAccount.current) {
+      setModalOpen(false);
+      showToast('confirmed', 'Wallet connected successfully.');
     }
-  }
-
-  const handleSaveCompany = async () => {
-    try {
-      if (!w3client) throw new Error("No Web3.Storage token configured")
-      const next = upsertEntry(book, newCompanyName, newCompanyAddress)
-      const cid = await putBook(w3client, next)
-      setBook(next)
-      setBookCid(cid)
-      setNewCompanyName("")
-      setNewCompanyAddress("")
-    } catch (err) {
-      console.error(err)
-    }
-  }
+    prevAccount.current = wallet.account;
+  }, [wallet.account]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-100 via-white to-green-200 flex flex-col items-center py-10">
-      {/* Header */}
-      <header className="w-full max-w-3xl flex justify-between items-center px-6 py-4 bg-white shadow-md rounded-2xl mb-8">
-        <h2 className="text-xl font-bold text-green-700">
-          🌱 Green Hydrogen Credit
-        </h2>
-        <div className="flex items-center gap-3">
-          <button onClick={handleWatchAsset} className="px-3 py-1.5 text-sm rounded-md bg-emerald-600 text-white hover:bg-emerald-700">Add GHC to Wallet</button>
-          <ConnectButton />
+    <div className="min-h-screen bg-[#0a0a0a]">
+
+      <Navbar
+        account={wallet.account}
+        accountName={accountName}
+        connecting={wallet.connecting}
+        onOpenModal={() => setModalOpen(true)}
+        onDisconnect={wallet.disconnect}
+      />
+
+      {/* Wrong network banner */}
+      {wallet.account && !wallet.isCorrectNetwork && (
+        <div className="bg-[#1a0a00] border-b border-[#3a1a00] px-4 py-2.5 text-center">
+          <p className="text-xs text-[#fbbf24]">
+            ⚠️ You're on the wrong network. Please switch to <strong>Ethereum Sepolia</strong> in MetaMask.
+          </p>
         </div>
-      </header>
+      )}
 
-      {isConnected ? (
-  <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 flex flex-col gap-6">
-          {/* Balance */}
-          <div className="text-center">
-            <h3 className="text-lg font-semibold text-gray-700">Your Balance</h3>
-            <p className="text-3xl font-bold text-green-600 mt-2">
-              {typeof balance === 'bigint' ? formatUnits(balance, Number(decimals ?? 18)) : (balance ?? 0)}
-            </p>
-          </div>
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
 
-          {/* Input */}
-          <input
-            type="number"
-            placeholder="Enter amount"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none text-center"
-          />
-
-          {/* Buttons */}
-          <div className="flex gap-4 justify-center">
-            <button
-              onClick={handleMint}
-              disabled={!amount}
-              className="px-6 py-2 rounded-lg bg-green-600 text-white font-semibold shadow hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              Mint
-            </button>
-            <button
-              onClick={handleBurn}
-              disabled={!amount}
-              className="px-6 py-2 rounded-lg bg-red-500 text-white font-semibold shadow hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              Burn
-            </button>
-          </div>
-
-          {/* Transfer */}
-          <div className="border-t pt-4">
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">Transfer Credits</h3>
-            <input
-              type="text"
-              placeholder="Recipient (0x... or company name)"
-              value={recipient}
-              onChange={(e) => setRecipient(e.target.value)}
-              className="w-full mb-3 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
-            />
-            <div className="flex gap-3">
-              <input
-                type="number"
-                placeholder="Amount"
-                value={transferAmount}
-                onChange={(e) => setTransferAmount(e.target.value)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={handleTransfer}
-                  disabled={!isAddress(recipient) || !transferAmount}
-                  className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold shadow hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+        {/* Page Header */}
+        <div className="mb-7">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-xl font-semibold text-[#e5e7eb] mb-0.5">
+                Green Hydrogen Credit Dashboard
+              </h1>
+              <p className="text-sm text-[#4b5563]">
+                Manage, transfer, and verify your GHC portfolio on Ethereum
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#1a1a1a] bg-[#111111] text-xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#4ade80]" />
+                <span className="text-[#6b7280]">Ethereum Sepolia</span>
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#1a1a1a] bg-[#111111] text-xs text-[#4b5563]">
+                Contract&nbsp;
+                <a
+                  href={`https://sepolia.etherscan.io/address/${import.meta.env.VITE_CONTRACT_ADDRESS}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mono text-[#60a5fa] hover:underline"
                 >
-                  Transfer by Address
-                </button>
-                <button
-                  onClick={handleTransferByName}
-                  disabled={!recipient || recipient.startsWith('0x') || !transferAmount}
-                  className="px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold shadow hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                >
-                  Transfer by Name
-                </button>
+                  {`${import.meta.env.VITE_CONTRACT_ADDRESS?.slice(0, 6)}...${import.meta.env.VITE_CONTRACT_ADDRESS?.slice(-4)}`}
+                </a>
               </div>
             </div>
-            {isAddress(recipient) && (
-              <p className="text-xs text-gray-600 mt-2">
-                Recipient on-chain balance: {typeof recipientBalance === 'bigint' ? formatUnits(recipientBalance, Number(decimals ?? 18)) : '—'}
-              </p>
-            )}
-            {bookCid && (
-              <p className="text-xs text-gray-500 mt-2 break-all">Company book CID: {bookCid}</p>
-            )}
-          </div>
-
-          {/* Company book admin */}
-          <div className="border-t pt-4">
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">Save Company Mapping (name → address)</h3>
-            <div className="flex gap-3 mb-3">
-              <input
-                type="text"
-                placeholder="Company name"
-                value={newCompanyName}
-                onChange={(e) => setNewCompanyName(e.target.value)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
-              />
-              <input
-                type="text"
-                placeholder="0x... address"
-                value={newCompanyAddress}
-                onChange={(e) => setNewCompanyAddress(e.target.value)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
-              />
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleSaveCompany}
-                disabled={!newCompanyName || !newCompanyAddress}
-                className="px-4 py-2 rounded-lg bg-green-600 text-white font-semibold shadow hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-              >
-                Save to IPFS
-              </button>
-            </div>
-          </div>
-
-          {/* Transaction status */}
-          <div className="text-center text-sm">
-            {hash && (
-              <p className="text-gray-500 truncate">
-                Tx sent:{" "}
-                <span className="text-blue-600 font-mono">{hash}</span>
-              </p>
-            )}
-            {isLoading && <p className="text-yellow-600">⏳ Confirming...</p>}
-            {isSuccess && <p className="text-green-600">✅ Confirmed!</p>}
-            {isError && <p className="text-red-600">❌ Failed.</p>}
           </div>
         </div>
-      ) : (
-        <p className="text-gray-600 text-lg">Please connect your wallet.</p>
+
+        {/* Tab Navigation */}
+        <div className="mb-6">
+          <TabBar active={activeTab} onChange={setActiveTab} />
+        </div>
+
+        {/* Tab Content */}
+        <div>
+          {activeTab === 'overview' && (
+            <OverviewTab
+              onToast={showToast}
+              wallet={wallet}
+              onConnectWallet={() => setModalOpen(true)}
+            />
+          )}
+          {activeTab === 'transfer' && (
+            <TransferTab
+              onToast={showToast}
+              wallet={wallet}
+              onConnectWallet={() => setModalOpen(true)}
+            />
+          )}
+          {activeTab === 'marketplace' && (
+            <MarketplaceTab
+              onToast={showToast}
+              wallet={wallet}
+              onConnectWallet={() => setModalOpen(true)}
+            />
+          )}
+          {activeTab === 'admin' && (
+            <AdminTab
+              onToast={showToast}
+              wallet={wallet}
+              onConnectWallet={() => setModalOpen(true)}
+            />
+          )}
+        </div>
+      </main>
+
+      <ToastWidget
+        status={toast.status}
+        message={toast.message}
+        txHash={toast.txHash}
+        onClose={clearToast}
+      />
+
+      {modalOpen && (
+        <WalletModal
+          connecting={wallet.connecting}
+          error={wallet.error}
+          onConnect={wallet.connect}
+          onClose={() => setModalOpen(false)}
+        />
       )}
     </div>
-  )
+  );
 }

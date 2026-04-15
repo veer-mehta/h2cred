@@ -1,0 +1,34 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Listing {
+  id                  String   @id @default(cuid())
+  seller              String
+  sellerStripeAccountId String?
+  amount              Float
+  pricePerGHC         Float
+  txHash              String   @unique
+  active              Boolean  @default(true)
+  status              String   @default("LISTED")
+  buyerAddress        String?
+  checkoutSessionId   String?  @unique
+  paymentIntentId     String?  @unique
+  payoutTransferId    String?  @unique
+  sellerPayoutStatus  String?  @default("UNPAID")
+  retirementTxHash    String?
+  createdAt           DateTime @default(now())
+}
+
+model Company {
+  id              String   @id @default(cuid())
+  name            String   @unique
+  address         String   @unique
+  stripeAccountId String?  @unique
+  createdAt       DateTime @default(now())
+}
