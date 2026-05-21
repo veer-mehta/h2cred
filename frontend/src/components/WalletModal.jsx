@@ -13,17 +13,14 @@ export default function WalletModal({ connecting, error, onConnect, onClose }) {
 
   return (
     <>
-      {/* Backdrop */}
       <div
         className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div className="card w-full max-w-sm p-6 animate-slide-up pointer-events-auto">
 
-          {/* Header */}
           <div className="flex items-start justify-between mb-6">
             <div>
               <p className="text-base font-semibold text-[#e5e7eb]">Connect Wallet</p>
@@ -37,7 +34,6 @@ export default function WalletModal({ connecting, error, onConnect, onClose }) {
             </button>
           </div>
 
-          {/* Error banners */}
           {error === 'rejected' && (
             <div className="card-inner mb-4 p-3 flex items-center gap-2 border-[#2a1010]">
               <AlertTriangle className="w-3.5 h-3.5 text-[#f87171] flex-shrink-0" />
@@ -51,7 +47,6 @@ export default function WalletModal({ connecting, error, onConnect, onClose }) {
             </div>
           )}
 
-          {/* MetaMask option */}
           <button
             onClick={handleMetaMask}
             disabled={connecting}
@@ -78,11 +73,6 @@ export default function WalletModal({ connecting, error, onConnect, onClose }) {
               <ExternalLink className="w-3.5 h-3.5 text-[#2a2a2a] group-hover:text-[#4b5563] transition-colors" />
             )}
           </button>
-
-          {/* Footer */}
-          <p className="text-[11px] text-[#374151] text-center mt-5 leading-relaxed">
-            By connecting you agree to interact with the H2Cred protocol on the Sepolia testnet. No real funds involved.
-          </p>
         </div>
       </div>
     </>

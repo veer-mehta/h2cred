@@ -23,7 +23,7 @@ export default function ToastWidget({ status, message, txHash, onClose }) {
 
   if (!visible || !status) return null;
 
-  const isOk  = status === 'confirmed';
+  const isOk = status === 'confirmed';
   const isBad = status === 'error';
   const isPrc = status === 'processing';
 
@@ -42,14 +42,12 @@ export default function ToastWidget({ status, message, txHash, onClose }) {
           borderColor: isOk ? '#0e2a0e' : isBad ? '#2a0e0e' : '#0e162a',
         }}
       >
-        {/* Top line indicator */}
         <div className="h-px w-full" style={{ background: isOk ? '#4ade80' : isBad ? '#f87171' : '#60a5fa' }} />
 
-        {/* Body */}
         <div className="p-4 flex gap-3">
           <div className="flex-shrink-0 mt-0.5">
             {isPrc && <Loader2 className="w-4 h-4 text-[#60a5fa] animate-spin" />}
-            {isOk  && <CheckCircle2 className="w-4 h-4 text-[#4ade80]" />}
+            {isOk && <CheckCircle2 className="w-4 h-4 text-[#4ade80]" />}
             {isBad && <AlertTriangle className="w-4 h-4 text-[#f87171]" />}
           </div>
 
@@ -85,7 +83,6 @@ export default function ToastWidget({ status, message, txHash, onClose }) {
           </div>
         </div>
 
-        {/* Progress bar for processing */}
         {isPrc && (
           <div className="h-0.5 w-full overflow-hidden bg-[#111111]">
             <div

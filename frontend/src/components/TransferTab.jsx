@@ -3,8 +3,6 @@ import { ethers } from 'ethers';
 import { Send, Wallet, Building2, Info, ArrowRight, Search } from 'lucide-react';
 import { GHC_ABI, CONTRACT_ADDRESS, toOnChain } from '../lib/contract';
 
-import { useMarketplace } from '../hooks/useMarketplace';
-
 function ConnectGate({ onConnect }) {
   return (
     <div className="max-w-xl mx-auto">
@@ -23,20 +21,18 @@ function ConnectGate({ onConnect }) {
 }
 
 export default function TransferTab({ onToast, wallet, onConnectWallet }) {
-  const [mode, setMode]         = useState('wallet');
+  const [mode, setMode] = useState('wallet');
   const [recipient, setRecipient] = useState('');
-  const [amount, setAmount]     = useState('');
-  const [loading, setLoading]   = useState(false);
+  const [amount, setAmount] = useState('');
+  const [loading, setLoading] = useState(false);
   const [resolved, setResolved] = useState(null);
   const [registry, setRegistry] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  // Compute top 5 matching companies for autocomplete
   const suggestions = mode === 'company' && recipient.length > 0
     ? registry.filter(c => c.name.toLowerCase().includes(recipient.toLowerCase())).slice(0, 5)
     : [];
 
-  // Fetch registry from database
   useEffect(() => {
     (async () => {
       try {
@@ -85,9 +81,9 @@ export default function TransferTab({ onToast, wallet, onConnectWallet }) {
     onToast('processing', `Transferring ${amount} GHC…`);
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer   = await provider.getSigner();
+      const signer = await provider.getSigner();
       const contract = new ethers.Contract(CONTRACT_ADDRESS, GHC_ABI, signer);
-      const tx       = await contract.transfer(toAddr, toOnChain(amount));
+      const tx = await contract.transfer(toAddr, toOnChain(amount));
       onToast('processing', `Transferring ${amount} GHC…`, tx.hash);
       await tx.wait();
       onToast('confirmed', `${amount} GHC sent`, tx.hash);
@@ -117,13 +113,12 @@ export default function TransferTab({ onToast, wallet, onConnectWallet }) {
           </div>
         </div>
 
-        {/* Mode toggle */}
         <div className="mb-5">
           <label className="field-label">Recipient type</label>
           <div className="flex gap-1 p-1 rounded-lg bg-[#0d0d0d] border border-[#1a1a1a]">
             {[
-              { id: 'wallet',  label: 'Wallet Address', icon: Wallet },
-              { id: 'company', label: 'Company Name',   icon: Building2 },
+              { id: 'wallet', label: 'Wallet Address', icon: Wallet },
+              { id: 'company', label: 'Company Name', icon: Building2 },
             ].map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
@@ -141,7 +136,6 @@ export default function TransferTab({ onToast, wallet, onConnectWallet }) {
           </div>
         </div>
 
-        {/* Recipient input */}
         <div className="mb-4 relative">
           <label className="field-label">Recipient</label>
           <div className="relative">
@@ -157,7 +151,6 @@ export default function TransferTab({ onToast, wallet, onConnectWallet }) {
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#4b5563]" />
             )}
           </div>
-          {/* Autocomplete dropdown */}
           {showSuggestions && suggestions.length > 0 && (
             <div className="absolute z-20 left-0 right-0 mt-1 rounded-lg border border-[#1a1a1a] bg-[#0d0d0d] shadow-lg overflow-hidden animate-slide-up">
               {suggestions.map((company) => (
@@ -189,7 +182,6 @@ export default function TransferTab({ onToast, wallet, onConnectWallet }) {
           )}
         </div>
 
-        {/* Resolved badge */}
         {resolved && (
           <div className="mb-4 card-inner p-4 flex items-center justify-between animate-slide-up">
             <div>
@@ -209,7 +201,6 @@ export default function TransferTab({ onToast, wallet, onConnectWallet }) {
           </div>
         )}
 
-        {/* Amount */}
         <div className="mb-6">
           <label className="field-label">Amount</label>
           <div className="relative">
@@ -235,13 +226,12 @@ export default function TransferTab({ onToast, wallet, onConnectWallet }) {
           </div>
         </div>
 
-        {/* Summary */}
         {recipient && amount && (
           <div className="mb-5 card-inner p-4 space-y-2 animate-slide-up">
             {[
-              ['You send',   `${amount} GHC`],
+              ['You send', `${amount} GHC`],
               ['Gas (est.)', '~$0.38'],
-              ['Network',    'Sepolia'],
+              ['Network', 'Sepolia'],
             ].map(([k, v]) => (
               <div key={k} className="flex justify-between text-xs">
                 <span className="text-[#4b5563]">{k}</span>
@@ -251,7 +241,6 @@ export default function TransferTab({ onToast, wallet, onConnectWallet }) {
           </div>
         )}
 
-        {/* CTA */}
         <button
           onClick={handleTransfer}
           disabled={loading || !recipient || !(parseInt(amount) > 0)}

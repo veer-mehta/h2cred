@@ -1,627 +1,370 @@
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import { ethers } from 'ethers';
-import crypto from 'crypto';
-import { PrismaPg } from '@prisma/adapter-pg';
-import pg from 'pg';
-import prismaModule from './generated/prisma/index.js';
+import "dotenv/config";
+import express from "express";
+import cors from "cors";
+import pg from "pg";
+import { ethers } from "ethers";
+import crypto from "crypto";
 
-dotenv.config();
+const PORT = 5000;
+const GHC_ABI = [
+  "function transfer(address to, uint256 amount) returns (bool)",
+  "function burnFrom(address account, uint256 amount)",
+  "function decimals() view returns (uint8)",
+];
 
-const { PrismaClient } = prismaModule;
-const PORT = Number(process.env.PORT || 5000);
-const STRIPE_API_BASE = 'https://api.stripe.com/v1';
-const REQUIRED_STRIPE_FIELDS = ['STRIPE_SECRET_KEY'];
-const REQUIRED_STRIPE_WEBHOOK_FIELDS = ['STRIPE_WEBHOOK_SECRET'];
-const REQUIRED_CHAIN_FIELDS = ['ALCHEMY_URL', 'PRIVATE_KEY', 'CONTRACT_ADDRESS'];
+const dburi = process.env.DATABASE_URL;
+const pool = new pg.Pool({ connectionString: dburi });
+
+async function initDB() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "Listing" (
+        id VARCHAR(255) PRIMARY KEY,
+        seller VARCHAR(255) NOT NULL,
+        amount DOUBLE PRECISION NOT NULL,
+        "pricePerGHC" DOUBLE PRECISION NOT NULL,
+        "txHash" VARCHAR(255) UNIQUE NOT NULL,
+        active BOOLEAN DEFAULT TRUE,
+        status VARCHAR(255) DEFAULT 'LISTED',
+        "buyerAddress" VARCHAR(255),
+        "checkoutSessionId" VARCHAR(255) UNIQUE,
+        "paymentIntentId" VARCHAR(255) UNIQUE,
+        "payoutTransferId" VARCHAR(255) UNIQUE,
+        "sellerPayoutStatus" VARCHAR(255) DEFAULT 'UNPAID',
+        "retirementTxHash" VARCHAR(255),
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS "Company" (
+        id VARCHAR(255) PRIMARY KEY,
+        name VARCHAR(255) UNIQUE NOT NULL,
+        address VARCHAR(255) UNIQUE NOT NULL,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("Database verified successfully.");
+  } catch (err) {
+    console.error("Database verification failed:", err);
+  }
+}
+
+let provider = null;
+let adminWallet = null;
+let ghcContract = null;
+let blockchainConfigured = false;
+
+if (
+  process.env.ALCHEMY_URL &&
+  process.env.PRIVATE_KEY &&
+  process.env.CONTRACT_ADDRESS
+) {
+  try {
+    provider = new ethers.JsonRpcProvider(process.env.ALCHEMY_URL);
+    adminWallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+    ghcContract = new ethers.Contract(process.env.CONTRACT_ADDRESS, GHC_ABI, adminWallet);
+    blockchainConfigured = true;
+    console.log("Blockchain loaded successfully. GHC Contract:", process.env.CONTRACT_ADDRESS);
+  } catch (err) {
+    console.error("Failed to init blockchain connection:", err);
+  }
+} else {
+  console.warn("Blockchain missing env vars (ALCHEMY_URL, PRIVATE_KEY, CONTRACT_ADDRESS).");
+  exit(1);
+}
+
+function isValidAddress(addr) {
+  return typeof addr === "string" && ethers.isAddress(addr);
+}
+
+function isValidTxHash(hash) {
+  return typeof hash === "string" && ethers.isHexString(hash, 32);
+}
+
+function isPositiveNumber(val) {
+  const num = Number(val);
+  return Number.isFinite(num) && num > 0;
+}
+
+
 
 const app = express();
 app.use(cors());
-
-function buildLocalDatabaseUrl() {
-  const user = process.env.PGUSER || 'postgres';
-  const password = process.env.PGPASSWORD || 'postgres';
-  const host = process.env.PGHOST || '127.0.0.1';
-  const port = process.env.PGPORT || '5432';
-  const database = process.env.PGDATABASE || 'h2cred';
-
-  return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}`;
-}
-
-const connectionString = process.env.DATABASE_URL || buildLocalDatabaseUrl();
-const pool = new pg.Pool({ connectionString });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
-
-const missingStripeEnv = REQUIRED_STRIPE_FIELDS.filter((key) => !process.env[key]);
-const missingStripeWebhookEnv = REQUIRED_STRIPE_WEBHOOK_FIELDS.filter((key) => !process.env[key]);
-const missingChainEnv = REQUIRED_CHAIN_FIELDS.filter((key) => !process.env[key]);
-
-const GHC_ABI = [
-  'function transfer(address to, uint256 amount) returns (bool)',
-  'function burnFrom(address account, uint256 amount)',
-  'function decimals() view returns (uint8)',
-];
-
-const provider =
-  missingChainEnv.length === 0 ? new ethers.JsonRpcProvider(process.env.ALCHEMY_URL) : null;
-const adminWallet =
-  provider && process.env.PRIVATE_KEY ? new ethers.Wallet(process.env.PRIVATE_KEY, provider) : null;
-const ghcContract =
-  adminWallet && process.env.CONTRACT_ADDRESS
-    ? new ethers.Contract(process.env.CONTRACT_ADDRESS, GHC_ABI, adminWallet)
-    : null;
-
-function isPositiveNumber(value) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0;
-}
-
-function isNonEmptyString(value) {
-  return typeof value === 'string' && value.trim().length > 0;
-}
-
-function requireConfiguredEnv(res, missingVars, label) {
-  if (missingVars.length === 0) {
-    return true;
-  }
-
-  res.status(503).json({
-    error: `${label} is not configured on the server.`,
-    missing: missingVars,
-  });
-  return false;
-}
-
-function parseListingPayload(body, sellerStripeAccountId) {
-  const seller = body?.seller?.trim();
-  const txHash = body?.txHash?.trim();
-  const amount = Number(body?.amount);
-  const pricePerGHC = Number(body?.pricePerGHC);
-
-  if (!isNonEmptyString(seller) || !ethers.isAddress(seller)) {
-    return { error: 'A valid seller wallet address is required.' };
-  }
-
-  if (!isPositiveNumber(amount)) {
-    return { error: 'Amount must be a positive number.' };
-  }
-
-  if (!isPositiveNumber(pricePerGHC)) {
-    return { error: 'Price per GHC must be a positive number.' };
-  }
-
-  if (!isNonEmptyString(txHash) || !ethers.isHexString(txHash, 32)) {
-    return { error: 'A valid transaction hash is required.' };
-  }
-
-  return {
-    data: {
-      seller,
-      sellerStripeAccountId: sellerStripeAccountId || null,
-      amount,
-      pricePerGHC,
-      txHash,
-    },
-  };
-}
-
-function parseCompanyPayload(body) {
-  const name = body?.name?.trim();
-  const address = body?.address?.trim();
-  const stripeAccountId = body?.stripeAccountId?.trim() || null;
-
-  if (!isNonEmptyString(name)) {
-    return { error: 'Company name is required.' };
-  }
-
-  if (!isNonEmptyString(address) || !ethers.isAddress(address)) {
-    return { error: 'A valid wallet address is required.' };
-  }
-
-  if (stripeAccountId && !/^acct_[A-Za-z0-9]+$/.test(stripeAccountId)) {
-    return { error: 'Stripe account id must look like acct_...' };
-  }
-
-  return { data: { name, address, stripeAccountId } };
-}
-
-async function stripeRequest(path, options = {}) {
-  const { method = 'GET', body } = options;
-  const response = await fetch(`${STRIPE_API_BASE}${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`,
-      ...(body ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
-    },
-    body,
-  });
-
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload?.error?.message || 'Stripe request failed.');
-  }
-
-  return payload;
-}
-
-function buildStripeFormBody(fields) {
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(fields)) {
-    if (value !== undefined && value !== null) {
-      params.append(key, String(value));
-    }
-  }
-  return params.toString();
-}
-
-function parseStripeSignatureHeader(signatureHeader) {
-  if (!isNonEmptyString(signatureHeader)) {
-    return null;
-  }
-
-  const values = Object.fromEntries(
-    signatureHeader.split(',').map((part) => part.trim().split('=')),
-  );
-
-  if (!values.t || !values.v1) {
-    return null;
-  }
-
-  return { timestamp: values.t, signature: values.v1 };
-}
-
-function verifyStripeWebhookSignature(rawBody, signatureHeader, secret) {
-  const parsedHeader = parseStripeSignatureHeader(signatureHeader);
-  if (!parsedHeader) {
-    return false;
-  }
-
-  const signedPayload = `${parsedHeader.timestamp}.${rawBody.toString('utf8')}`;
-  const expectedSignature = crypto
-    .createHmac('sha256', secret)
-    .update(signedPayload, 'utf8')
-    .digest('hex');
-
-  const received = Buffer.from(parsedHeader.signature, 'hex');
-  const expected = Buffer.from(expectedSignature, 'hex');
-
-  if (received.length !== expected.length) {
-    return false;
-  }
-
-  return crypto.timingSafeEqual(received, expected);
-}
-
-function getFrontendOrigin(req) {
-  if (isNonEmptyString(req.body?.origin)) {
-    return req.body.origin;
-  }
-
-  if (isNonEmptyString(req.headers.origin)) {
-    return req.headers.origin;
-  }
-
-  return 'http://localhost:5173';
-}
-
-async function recordSellerSettlement({ listingId }) {
-  return {
-    id: `demo_settlement_${listingId}`,
-    status: 'PENDING_OFF_PLATFORM_SETTLEMENT',
-  };
-}
-
-async function retirePurchasedCredits({ listing, buyerAddress }) {
-  if (missingChainEnv.length > 0 || !ghcContract) {
-    throw new Error('Blockchain transfer is not configured on the server.');
-  }
-
-  const decimals = await ghcContract.decimals();
-  const amountToTransfer = ethers.parseUnits(listing.amount.toString(), Number(decimals));
-
-  const transferTx = await ghcContract.transfer(buyerAddress, amountToTransfer);
-  await transferTx.wait();
-
-  const burnTx = await ghcContract.burnFrom(buyerAddress, amountToTransfer);
-  await burnTx.wait();
-
-  return {
-    transferTxHash: transferTx.hash,
-    retirementTxHash: burnTx.hash,
-  };
-}
-
-async function fulfillListingPurchase({ listingId, buyerAddress, checkoutSessionId, paymentIntentId }) {
-  let listing = await prisma.listing.findUnique({ where: { id: listingId } });
-  if (!listing) {
-    throw new Error('Listing not found.');
-  }
-
-  if (listing.status === 'RETIRED') {
-    return { alreadyProcessed: true, listing };
-  }
-
-  if (!listing.active && !listing.payoutTransferId && listing.sellerPayoutStatus === 'PENDING_OFF_PLATFORM_SETTLEMENT') {
-    return { alreadyProcessed: true, listing };
-  }
-
-  if (!listing.payoutTransferId) {
-    const settlement = await recordSellerSettlement({ listingId: listing.id });
-
-    listing = await prisma.listing.update({
-      where: { id: listing.id },
-      data: {
-        status: 'PAID_OUT',
-        buyerAddress,
-        checkoutSessionId,
-        paymentIntentId,
-        payoutTransferId: settlement.id,
-        sellerPayoutStatus: settlement.status,
-      },
-    });
-  }
-
-  if (listing.retirementTxHash) {
-    return {
-      alreadyProcessed: true,
-      listing,
-      payoutTransferId: listing.payoutTransferId,
-      retirementTxHash: listing.retirementTxHash,
-    };
-  }
-
-  const retirement = await retirePurchasedCredits({ listing, buyerAddress });
-
-  const updatedListing = await prisma.listing.update({
-    where: { id: listing.id },
-    data: {
-      active: false,
-      status: 'RETIRED',
-      buyerAddress,
-      checkoutSessionId,
-      paymentIntentId,
-      retirementTxHash: retirement.retirementTxHash,
-      sellerPayoutStatus: 'PENDING_OFF_PLATFORM_SETTLEMENT',
-    },
-  });
-
-  return {
-    alreadyProcessed: false,
-    listing: updatedListing,
-    payoutTransferId: updatedListing.payoutTransferId,
-    transferTxHash: retirement.transferTxHash,
-    retirementTxHash: retirement.retirementTxHash,
-  };
-}
-
-app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  if (!requireConfiguredEnv(res, missingStripeWebhookEnv, 'Stripe webhook')) {
-    return;
-  }
-  if (!requireConfiguredEnv(res, missingStripeEnv, 'Stripe payments')) {
-    return;
-  }
-  if (!requireConfiguredEnv(res, missingChainEnv, 'Blockchain transfer')) {
-    return;
-  }
-
-  const signatureHeader = req.headers['stripe-signature'];
-  const rawBody = req.body;
-
-  if (!Buffer.isBuffer(rawBody) || !signatureHeader) {
-    return res.status(400).json({ error: 'Missing raw webhook payload or Stripe signature header.' });
-  }
-
-  const isValid = verifyStripeWebhookSignature(
-    rawBody,
-    String(signatureHeader),
-    process.env.STRIPE_WEBHOOK_SECRET,
-  );
-
-  if (!isValid) {
-    return res.status(400).json({ error: 'Invalid Stripe webhook signature.' });
-  }
-
-  try {
-    const event = JSON.parse(rawBody.toString('utf8'));
-
-    switch (event.type) {
-      case 'checkout.session.completed': {
-        const session = event.data.object;
-        const listingId = session?.metadata?.listingId;
-        const buyerAddress = session?.metadata?.buyerAddress;
-
-        if (!isNonEmptyString(listingId) || !isNonEmptyString(buyerAddress)) {
-          return res.status(400).json({ error: 'Stripe session metadata is incomplete.' });
-        }
-
-        if (session.payment_status === 'paid') {
-          await fulfillListingPurchase({
-            listingId,
-            buyerAddress,
-            checkoutSessionId: session.id,
-            paymentIntentId: session.payment_intent || null,
-          });
-        }
-        break;
-      }
-      default:
-        console.log(`Unhandled Stripe webhook event: ${event.type}`);
-        break;
-    }
-
-    return res.json({ received: true });
-  } catch (error) {
-    console.error('Stripe webhook processing failed:', error);
-    return res.status(400).json({ error: error.message || 'Invalid Stripe webhook payload.' });
-  }
-});
-
 app.use(express.json());
 
-app.get('/api/health', async (req, res) => {
+
+app.use((req, res, next) => {
+  if (
+    typeof req.body?.origin === "string" &&
+    req.body.origin.trim().length > 0
+  ) {
+    req.origin = req.body.origin;
+  } else if (
+    typeof req.headers.origin === "string" &&
+    req.headers.origin.trim().length > 0
+  ) {
+    req.origin = req.headers.origin;
+  } else {
+    req.origin = "http://localhost:5173";
+  }
+  next();
+});
+
+
+// Health check
+// app.get("/api/health", async (req, res) => {
+//   try {
+//     await pool.query("SELECT 1");
+//     res.json({
+//       ok: true,
+//       database: "connected",
+//       databaseUrlSource: process.env.DATABASE_URL
+//         ? "DATABASE_URL"
+//         : "local-postgres-defaults",
+//       paymentsConfigured: true, // Mock billing is always configured
+//       blockchainConfigured: blockchainConfigured,
+//     });
+//   } catch (err) {
+//     res.status(500).json({
+//       ok: false,
+//       database: "disconnected",
+//       error: err.message,
+//     });
+//   }
+// });
+
+
+app.get("/api/listings", async (req, res) => {
   try {
-    await prisma.$queryRaw`SELECT 1`;
-    res.json({
-      ok: true,
-      database: 'connected',
-      databaseUrlSource: process.env.DATABASE_URL ? 'DATABASE_URL' : 'local-postgres-defaults',
-      paymentsConfigured: missingStripeEnv.length === 0,
-      blockchainConfigured: Boolean(ghcContract),
-    });
-  } catch (error) {
-    res.status(500).json({
-      ok: false,
-      database: 'disconnected',
-      databaseUrlSource: process.env.DATABASE_URL ? 'DATABASE_URL' : 'local-postgres-defaults',
-      error: error.message,
-    });
+    const { rows } = await pool.query(
+      'SELECT * FROM "Listing" WHERE active = true ORDER BY "createdAt" DESC'
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Failed to fetch listings:", err);
+    res.status(500).json({ error: "Failed to load listings." });
   }
 });
 
-app.get('/api/listings', async (req, res) => {
-  try {
-    const activeListings = await prisma.listing.findMany({
-      where: { active: true },
-      orderBy: { createdAt: 'desc' },
-    });
 
-    res.json(activeListings);
-  } catch (error) {
-    console.error('Failed to load listings:', error);
-    res.status(500).json({ error: 'Failed to load listings.' });
-  }
-});
-
-app.post('/api/listings', async (req, res) => {
+app.post("/api/listings", async (req, res) => {
   try {
     const seller = req.body?.seller?.trim();
-    if (!isNonEmptyString(seller) || !ethers.isAddress(seller)) {
-      return res.status(400).json({ error: 'A valid seller wallet address is required.' });
+    const txHash = req.body?.txHash?.trim();
+    const amount = Number(req.body?.amount);
+    const pricePerGHC = Number(req.body?.pricePerGHC);
+
+    if (!isValidAddress(seller)) {
+      return res
+        .status(400)
+        .json({ error: "A valid seller wallet address is required." });
+    }
+    if (!isPositiveNumber(amount)) {
+      return res
+        .status(400)
+        .json({ error: "Amount must be a positive number." });
+    }
+    if (!isPositiveNumber(pricePerGHC)) {
+      return res
+        .status(400)
+        .json({ error: "Price per GHC must be a positive number." });
+    }
+    if (!isValidTxHash(txHash)) {
+      return res
+        .status(400)
+        .json({ error: "A valid transaction hash is required." });
     }
 
-    const company = await prisma.company.findUnique({
-      where: { address: seller },
-    });
-
-    const parsed = parseListingPayload(req.body, company?.stripeAccountId);
-    if (parsed.error) {
-      return res.status(400).json({ error: parsed.error });
+    const duplicateCheck = await pool.query(
+      'SELECT id FROM "Listing" WHERE "txHash" = $1 LIMIT 1',
+      [txHash]
+    );
+    if (duplicateCheck.rows.length > 0) {
+      return res
+        .status(409)
+        .json({ error: "That transaction is already registered as a listing." });
     }
 
-    const existingListing = await prisma.listing.findUnique({
-      where: { txHash: parsed.data.txHash },
-    });
+    const id = `listing_${crypto.randomUUID()}`;
+    const insertRes = await pool.query(
+      `INSERT INTO "Listing" (id, seller, amount, "pricePerGHC", "txHash", active, status)
+       VALUES ($1, $2, $3, $4, $5, true, 'LISTED')
+       RETURNING *`,
+      [id, seller, amount, pricePerGHC, txHash]
+    );
 
-    if (existingListing) {
-      return res.status(409).json({ error: 'That transaction is already registered as a listing.' });
-    }
-
-    const listing = await prisma.listing.create({
-      data: {
-        ...parsed.data,
-        active: true,
-        status: 'LISTED',
-      },
-    });
-
-    return res.status(201).json(listing);
-  } catch (error) {
-    console.error('Failed to create listing:', error);
-    return res.status(500).json({ error: 'Failed to create listing.' });
+    res.status(201).json(insertRes.rows[0]);
+  } catch (err) {
+    console.error("Failed to create listing:", err);
+    res.status(500).json({ error: "Failed to create listing." });
   }
 });
 
-app.post('/api/checkout-session', async (req, res) => {
-  if (!requireConfiguredEnv(res, missingStripeEnv, 'Stripe payments')) {
-    return;
-  }
 
-  const listingId = req.body?.listingId;
-  const buyerAddress = req.body?.buyerAddress?.trim();
-
-  if (!isNonEmptyString(listingId)) {
-    return res.status(400).json({ error: 'Listing id is required.' });
-  }
-
-  if (!isNonEmptyString(buyerAddress) || !ethers.isAddress(buyerAddress)) {
-    return res.status(400).json({ error: 'A valid buyer wallet address is required.' });
-  }
-
+app.post("/api/checkout-session", async (req, res) => {
   try {
-    const listing = await prisma.listing.findFirst({
-      where: {
-        id: listingId,
-        active: true,
-        status: 'LISTED',
-      },
+    const listingId = req.body?.listingId;
+    const buyerAddress = req.body?.buyerAddress?.trim();
+
+    if (!listingId) {
+      return res.status(400).json({ error: "Listing id is required." });
+    }
+    if (!isValidAddress(buyerAddress)) {
+      return res
+        .status(400)
+        .json({ error: "A valid buyer wallet address is required." });
+    }
+
+    const listingRes = await pool.query(
+      'SELECT * FROM "Listing" WHERE id = $1 AND active = true AND status = \'LISTED\' LIMIT 1',
+      [listingId]
+    );
+    const listing = listingRes.rows[0];
+    if (!listing) {
+      return res
+        .status(404)
+        .json({ error: "Listing not found or is inactive." });
+    }
+
+    const sessionId = `mock_session_${crypto.randomUUID()}`;
+
+    await pool.query(
+      'UPDATE "Listing" SET "checkoutSessionId" = $1, "buyerAddress" = $2, status = \'CHECKOUT_PENDING\' WHERE id = $3',
+      [sessionId, buyerAddress, listing.id]
+    );
+
+    console.log(`Starting mock on-chain transaction for listing: ${listing.id}`);
+
+    const decimals = await ghcContract.decimals();
+    const amountToTransfer = ethers.parseUnits(String(listing.amount), decimals);
+
+    console.log(`Transferring ${listing.amount} GHC to buyer: ${buyerAddress}`);
+
+    const transferTx = await ghcContract.transfer(buyerAddress, amountToTransfer);
+    const transferReceipt = await transferTx.wait();
+
+    console.log(`Transfer completed in tx: ${transferReceipt.hash}`);
+    console.log(`Burning/Retiring ${listing.amount} GHC from buyer: ${buyerAddress}`);
+
+    const burnTx = await ghcContract.burnFrom(buyerAddress, amountToTransfer);
+    const burnReceipt = await burnTx.wait();
+
+    console.log(`Retirement/Burn completed in tx: ${burnReceipt.hash}`);
+
+    const mockPaymentIntent = `mock_pi_${crypto.randomUUID()}`;
+    const mockPayoutTransfer = `demo_settlement_${listing.id}`;
+
+
+    await pool.query(
+      `UPDATE "Listing"
+       SET active = false,
+           status = 'RETIRED',
+           "paymentIntentId" = $1,
+           "payoutTransferId" = $2,
+           "sellerPayoutStatus" = 'PENDING_OFF_PLATFORM_SETTLEMENT',
+           "retirementTxHash" = $3
+       WHERE id = $4`,
+      [mockPaymentIntent, mockPayoutTransfer, burnReceipt.hash, listing.id]
+    );
+
+    res.json({ id: sessionId, success: true, retirementTxHash: burnReceipt.hash });
+  } catch (err) {
+    console.error("Failed to process mock checkout session:", err);
+    res.status(500).json({
+      error: err.message || "Failed to process mock checkout session.",
     });
+  }
+});
+
+
+app.get("/api/checkout-session/:sessionId", async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const listingRes = await pool.query(
+      'SELECT * FROM "Listing" WHERE "checkoutSessionId" = $1 LIMIT 1',
+      [sessionId]
+    );
+    const listing = listingRes.rows[0];
 
     if (!listing) {
-      return res.status(404).json({ error: 'Listing not found or already inactive.' });
+      return res.status(404).json({ error: "Checkout session not found." });
     }
-
-    const origin = getFrontendOrigin(req);
-    const totalAmountInPaise = Math.round(listing.amount * listing.pricePerGHC * 100);
-    if (totalAmountInPaise <= 0) {
-      return res.status(400).json({ error: 'Listing amount is invalid.' });
-    }
-
-    const session = await stripeRequest('/checkout/sessions', {
-      method: 'POST',
-      body: buildStripeFormBody({
-        mode: 'payment',
-        success_url: `${origin}/?tab=marketplace&payment=success&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${origin}/?tab=marketplace&payment=cancelled`,
-        'line_items[0][quantity]': 1,
-        'line_items[0][price_data][currency]': 'inr',
-        'line_items[0][price_data][unit_amount]': totalAmountInPaise,
-        'line_items[0][price_data][product_data][name]': `${listing.amount} GHC Credits`,
-        'line_items[0][price_data][product_data][description]': `Purchase and retire ${listing.amount} Green Hydrogen Credits from ${listing.seller}`,
-        'metadata[listingId]': listing.id,
-        'metadata[buyerAddress]': buyerAddress,
-        'metadata[sellerAddress]': listing.seller,
-        'metadata[amount]': listing.amount,
-        ...(listing.sellerStripeAccountId
-          ? { 'metadata[sellerStripeAccountId]': listing.sellerStripeAccountId }
-          : {}),
-        'payment_intent_data[metadata][listingId]': listing.id,
-        'payment_intent_data[metadata][buyerAddress]': buyerAddress,
-        'payment_intent_data[metadata][sellerAddress]': listing.seller,
-        ...(listing.sellerStripeAccountId
-          ? { 'payment_intent_data[metadata][sellerStripeAccountId]': listing.sellerStripeAccountId }
-          : {}),
-      }),
-    });
-
-    await prisma.listing.update({
-      where: { id: listing.id },
-      data: {
-        checkoutSessionId: session.id,
-        buyerAddress,
-        status: 'CHECKOUT_PENDING',
-      },
-    });
-
-    return res.json({
-      id: session.id,
-      url: session.url,
-    });
-  } catch (error) {
-    console.error('Failed to create Stripe Checkout session:', error);
-    return res.status(500).json({ error: error.message || 'Failed to create Stripe Checkout session.' });
-  }
-});
-
-app.get('/api/checkout-session/:sessionId', async (req, res) => {
-  if (!requireConfiguredEnv(res, missingStripeEnv, 'Stripe payments')) {
-    return;
-  }
-
-  try {
-    const session = await stripeRequest(`/checkout/sessions/${req.params.sessionId}`);
-    const listingId = session?.metadata?.listingId;
-    const listing = listingId
-      ? await prisma.listing.findUnique({
-          where: { id: listingId },
-        })
-      : null;
 
     res.json({
-      sessionId: session.id,
-      status: session.status,
-      paymentStatus: session.payment_status,
-      listingId,
-      fulfilled: Boolean(listing && listing.status === 'RETIRED'),
-      retirementTxHash: listing?.retirementTxHash ?? null,
-      payoutTransferId: listing?.payoutTransferId ?? null,
-      sellerPayoutStatus: listing?.sellerPayoutStatus ?? null,
+      sessionId: sessionId,
+      status: "complete",
+      paymentStatus: "paid",
+      listingId: listing.id,
+      fulfilled: listing.status === "RETIRED",
+      retirementTxHash: listing.retirementTxHash,
+      payoutTransferId: listing.payoutTransferId,
+      sellerPayoutStatus: listing.sellerPayoutStatus,
     });
-  } catch (error) {
-    console.error('Failed to fetch Stripe Checkout session:', error);
-    res.status(500).json({ error: error.message || 'Failed to fetch Stripe Checkout session.' });
+  } catch (err) {
+    console.error("Failed to query checkout session:", err);
+    res
+      .status(500)
+      .json({ error: "Failed to fetch checkout session details." });
   }
 });
 
-app.get('/api/registry', async (req, res) => {
-  try {
-    const companies = await prisma.company.findMany({
-      orderBy: { name: 'asc' },
-    });
 
-    res.json(companies);
-  } catch (error) {
-    console.error('Failed to load registry:', error);
-    res.status(500).json({ error: 'Failed to load registry.' });
+app.get("/api/registry", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT * FROM "Company" ORDER BY name ASC'
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Failed to fetch registry:", err);
+    res.status(500).json({ error: "Failed to load registry." });
   }
 });
 
-app.post('/api/registry', async (req, res) => {
-  const parsed = parseCompanyPayload(req.body);
-  if (parsed.error) {
-    return res.status(400).json({ error: parsed.error });
-  }
 
+app.post("/api/registry", async (req, res) => {
   try {
-    const existingByAddress = await prisma.company.findUnique({
-      where: { address: parsed.data.address },
-    });
+    const name = req.body?.name?.trim();
+    const address = req.body?.address?.trim();
+    const stripeAccountId = req.body?.stripeAccountId?.trim() || null;
 
-    if (existingByAddress && existingByAddress.name !== parsed.data.name) {
+    if (typeof name !== "string" || name.length === 0) {
+      return res.status(400).json({ error: "Company name is required." });
+    }
+    if (!isValidAddress(address)) {
+      return res
+        .status(400)
+        .json({ error: "A valid wallet address is required." });
+    }
+
+    const addrConflict = await pool.query(
+      'SELECT name FROM "Company" WHERE address = $1 AND name != $2 LIMIT 1',
+      [address, name]
+    );
+    if (addrConflict.rows.length > 0) {
       return res.status(409).json({
-        error: 'That wallet address is already registered to another company.',
+        error: "That wallet address is already registered to another company.",
       });
     }
 
-    if (parsed.data.stripeAccountId) {
-      const existingByStripeAccount = await prisma.company.findUnique({
-        where: { stripeAccountId: parsed.data.stripeAccountId },
-      });
+    const id = `company_${crypto.randomUUID()}`;
+    const upsertRes = await pool.query(
+      `INSERT INTO "Company" (id, name, address)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (name) DO UPDATE
+       SET address = EXCLUDED.address
+       RETURNING *`,
+      [id, name, address]
+    );
 
-      if (existingByStripeAccount && existingByStripeAccount.name !== parsed.data.name) {
-        return res.status(409).json({
-          error: 'That Stripe account is already linked to another company.',
-        });
-      }
-    }
-
-    const entry = await prisma.company.upsert({
-      where: { name: parsed.data.name },
-      update: {
-        address: parsed.data.address,
-        stripeAccountId: parsed.data.stripeAccountId,
-      },
-      create: parsed.data,
-    });
-
-    return res.json(entry);
-  } catch (error) {
-    console.error('Failed to save company to registry:', error);
-    return res.status(500).json({ error: 'Failed to save company to registry.' });
+    res.json(upsertRes.rows[0]);
+  } catch (err) {
+    console.error("Failed to register company:", err);
+    res.status(500).json({ error: "Failed to save company to registry." });
   }
 });
 
-app.use((req, res) => {
-  res.status(404).json({ error: 'Route not found.' });
-});
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
+  await initDB();
   console.log(`H2Cred Backend running on http://localhost:${PORT}`);
-});
-
-async function shutdown(signal) {
-  console.log(`Received ${signal}, shutting down backend...`);
-  await prisma.$disconnect().catch(() => {});
-  await pool.end().catch(() => {});
-  process.exit(0);
-}
-
-process.on('SIGINT', () => {
-  void shutdown('SIGINT');
-});
-
-process.on('SIGTERM', () => {
-  void shutdown('SIGTERM');
 });

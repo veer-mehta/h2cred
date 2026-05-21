@@ -1,14 +1,23 @@
 import { useState, useRef, useEffect } from 'react';
-import { Atom, Wallet, ChevronDown, Copy, ExternalLink, LogOut, Check } from 'lucide-react';
+import { Atom, Wallet, ChevronDown, Copy, ExternalLink, LogOut, Check, BarChart3, ArrowLeftRight, ShieldCheck, Store } from 'lucide-react';
+import { NavLink } from 'react-router-dom';
+
+const TABS = [
+  { path: '/', label: 'Overview', icon: BarChart3 },
+  { path: '/transfer', label: 'Transfer', icon: ArrowLeftRight },
+  { path: '/marketplace', label: 'Marketplace', icon: Store },
+  { path: '/admin', label: 'Admin', icon: ShieldCheck },
+];
 
 function truncate(addr) {
   return addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : '';
 }
 
-export default function Navbar({ account, accountName, connecting, onOpenModal, onDisconnect }) {
-  const [open, setOpen]     = useState(false);
+export default function Navbar({ account, accountName, connecting, onOpenModal, onDisconnect, isAdmin }) {
+  const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const dropRef = useRef(null);
+  const tabs = TABS.filter(t => t.path !== '/admin' || isAdmin);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -29,28 +38,53 @@ export default function Navbar({ account, accountName, connecting, onOpenModal, 
     <header className="sticky top-0 z-50 border-b border-[#1a1a1a] bg-[#0a0a0a]">
       <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
 
-        {/* Logo */}
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-lg bg-[#e5e7eb] flex items-center justify-center flex-shrink-0">
             <Atom className="w-4 h-4 text-[#0a0a0a]" strokeWidth={2.5} />
           </div>
           <span className="text-base font-semibold text-[#e5e7eb] tracking-tight">H2Cred</span>
-          <span className="text-[10px] font-medium text-[#374151] border border-[#1c1c1c] rounded px-1.5 py-0.5 ml-1">
-            TESTNET
-          </span>
         </div>
 
-        {/* Nav links */}
-        <nav className="hidden md:flex items-center gap-5">
-          {['Markets', 'Docs', 'Protocol'].map(l => (
-            <button key={l} className="text-xs font-medium text-[#4b5563] hover:text-[#9ca3af] transition-colors">
-              {l}
-            </button>
-          ))}
+        <nav className="flex-1 flex justify-center h-full">
+          <div className="flex items-center h-14">
+            {tabs.map(({ path, label, icon: Icon }) => (
+              <NavLink
+                key={path}
+                to={path}
+                className={({ isActive }) => [
+                  'flex items-center gap-2 px-4 h-full text-xs font-medium transition-colors relative whitespace-nowrap',
+                  isActive
+                    ? 'text-[#e5e7eb]'
+                    : 'text-[#4b5563] hover:text-[#9ca3af]',
+                ].join(' ')}
+              >
+                {({ isActive }) => (
+                  <>
+                    <Icon className="w-3.5 h-3.5" />
+                    {label}
+                    {isActive && (
+                      <span className="absolute bottom-0 left-0 right-0 h-px bg-[#e5e7eb]" />
+                    )}
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </div>
         </nav>
 
-        {/* Wallet actions */}
         <div className="flex items-center gap-2">
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#1a1a1a] bg-[#111111] text-xs text-[#4b5563] mr-2">
+            Contract&nbsp;
+            <a
+              href={`https://sepolia.etherscan.io/address/${import.meta.env.VITE_CONTRACT_ADDRESS}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mono text-[#60a5fa] hover:underline"
+            >
+              {`${import.meta.env.VITE_CONTRACT_ADDRESS?.slice(0, 6)}...${import.meta.env.VITE_CONTRACT_ADDRESS?.slice(-4)}`}
+            </a>
+          </div>
+
           {account ? (
             <div className="relative" ref={dropRef}>
               <button
@@ -64,7 +98,6 @@ export default function Navbar({ account, accountName, connecting, onOpenModal, 
 
               {open && (
                 <div className="absolute right-0 mt-2 w-52 card border border-[#1c1c1c] shadow-2xl animate-slide-up">
-                  {/* Address strip */}
                   <div className="px-4 py-3 border-b border-[#1a1a1a]">
                     {accountName && (
                       <p className="text-sm font-semibold text-[#e5e7eb] mb-1">{accountName}</p>
@@ -73,7 +106,6 @@ export default function Navbar({ account, accountName, connecting, onOpenModal, 
                     <p className="mono text-xs text-[#6b7280]">{truncate(account)}</p>
                   </div>
 
-                  {/* Actions */}
                   <div className="p-1">
                     <button
                       onClick={copy}

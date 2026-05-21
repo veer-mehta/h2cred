@@ -29,15 +29,14 @@ export default function MarketplaceTab({ onToast, wallet, onConnectWallet }) {
   if (!account) return <ConnectGate onConnect={onConnectWallet} />;
 
   const handleList = async () => {
-    if (!amount || !pricePerGHC || parseFloat(amount) < 1) return;
+    if (!amount || !pricePerGHC || parseFloat(amount) <= 0 || (ghcBalance !== null && parseFloat(amount) > ghcBalance)) return;
     await listCredits(amount, pricePerGHC);
     setAmount('');
   };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 max-w-6xl mx-auto">
-      
-      {/* SELL SIDE */}
+
       <div className="lg:col-span-5 space-y-6">
         <div className="card p-7">
           <div className="flex items-center gap-2.5 mb-7">
@@ -46,7 +45,7 @@ export default function MarketplaceTab({ onToast, wallet, onConnectWallet }) {
             </div>
             <div>
               <p className="text-sm font-semibold text-[#e5e7eb]">List GHC for Sale</p>
-              <p className="text-xs text-[#4b5563]">List NGO credits for retirement via Stripe Checkout</p>
+              <p className="text-xs text-[#4b5563]">List NGO credits for retirement</p>
             </div>
           </div>
 
@@ -56,10 +55,27 @@ export default function MarketplaceTab({ onToast, wallet, onConnectWallet }) {
               <div className="relative">
                 <input
                   type="number"
+                  min="0.000001"
+                  step="any"
+                  max={ghcBalance !== null ? ghcBalance : undefined}
                   className="input-field pr-14"
                   placeholder="0"
                   value={amount}
-                  onChange={e => setAmount(e.target.value)}
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (val === '') {
+                      setAmount('');
+                      return;
+                    }
+                    const num = parseFloat(val);
+                    if (num < 0) {
+                      setAmount('0');
+                    } else if (ghcBalance !== null && num > ghcBalance) {
+                      setAmount(String(ghcBalance));
+                    } else {
+                      setAmount(val);
+                    }
+                  }}
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-[#374151] font-mono">GHC</span>
               </div>
@@ -73,10 +89,24 @@ export default function MarketplaceTab({ onToast, wallet, onConnectWallet }) {
               <div className="relative">
                 <input
                   type="number"
+                  min="0.01"
+                  step="any"
                   className="input-field pr-14"
                   placeholder="500"
                   value={pricePerGHC}
-                  onChange={e => setPricePerGHC(e.target.value)}
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (val === '') {
+                      setPricePerGHC('');
+                      return;
+                    }
+                    const num = parseFloat(val);
+                    if (num < 0) {
+                      setPricePerGHC('0');
+                    } else {
+                      setPricePerGHC(val);
+                    }
+                  }}
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-[#374151] font-mono">₹</span>
               </div>
@@ -95,7 +125,14 @@ export default function MarketplaceTab({ onToast, wallet, onConnectWallet }) {
 
             <button
               onClick={handleList}
-              disabled={loading || !amount}
+              disabled={
+                loading ||
+                !amount ||
+                parseFloat(amount) <= 0 ||
+                (ghcBalance !== null && parseFloat(amount) > ghcBalance) ||
+                !pricePerGHC ||
+                parseFloat(pricePerGHC) <= 0
+              }
               className="btn-primary w-full py-3 text-sm flex items-center justify-center gap-2 mt-4"
             >
               {loading ? (
@@ -118,20 +155,19 @@ export default function MarketplaceTab({ onToast, wallet, onConnectWallet }) {
         <div className="card-inner p-5 flex gap-3 items-start border-[#0e162a] bg-[#0a0f1a]/30">
           <Info className="w-4 h-4 text-[#60a5fa] mt-0.5" />
           <p className="text-[11px] text-[#9ca3af] leading-relaxed">
-            By listing, your GHC will be transferred to a secure Escrow wallet. 
+            By listing, your GHC will be transferred to a secure Escrow wallet.
             Once a buyer pays, funds are received by the platform, the seller settlement is recorded for admin processing, and the credits are delivered to the buyer wallet and immediately retired.
           </p>
         </div>
       </div>
 
-      {/* BUY SIDE */}
       <div className="lg:col-span-7 space-y-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <ShoppingCart className="w-4 h-4 text-[#e5e7eb]" />
             <h2 className="text-sm font-semibold text-[#e5e7eb]">Active Credits Marketplace</h2>
           </div>
-          <button 
+          <button
             onClick={refresh}
             className="text-[10px] text-[#4b5563] hover:text-[#60a5fa] transition-colors"
           >
@@ -157,7 +193,7 @@ export default function MarketplaceTab({ onToast, wallet, onConnectWallet }) {
                   </div>
                   <span className="badge badge-green text-[9px] uppercase tracking-wider">Verified</span>
                 </div>
-                
+
                 <div className="space-y-1 mb-5">
                   <p className="text-[10px] text-[#4b5563] uppercase tracking-tighter">Listed by</p>
                   <p className="mono text-[11px] text-[#9ca3af] truncate">{listing.seller}</p>

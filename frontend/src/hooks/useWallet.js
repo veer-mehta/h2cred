@@ -5,15 +5,14 @@ import { GHC_ABI, CONTRACT_ADDRESS, SEPOLIA_CHAIN_ID, fromOnChain } from '../lib
 const LS_KEY = 'ghc_wallet_connected';
 
 export function useWallet() {
-  const [account, setAccount]         = useState(null);
-  const [chainId, setChainId]         = useState(null);
-  const [ghcBalance, setGhcBalance]   = useState(null);
+  const [account, setAccount] = useState(null);
+  const [chainId, setChainId] = useState(null);
+  const [ghcBalance, setGhcBalance] = useState(null);
   const [totalSupply, setTotalSupply] = useState(null);
   const [hasMinterRole, setHasMinterRole] = useState(false);
-  const [connecting, setConnecting]   = useState(false);
-  const [error, setError]             = useState(null);
+  const [connecting, setConnecting] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Stable ref so event listeners don't stale-close over account
   const accountRef = useRef(null);
   accountRef.current = account;
 
@@ -43,8 +42,8 @@ export function useWallet() {
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
       await provider.send('eth_requestAccounts', []);
-      const signer  = await provider.getSigner();
-      const addr    = await signer.getAddress();
+      const signer = await provider.getSigner();
+      const addr = await signer.getAddress();
       const network = await provider.getNetwork();
       setAccount(addr);
       setChainId(network.chainId);
@@ -67,7 +66,7 @@ export function useWallet() {
     localStorage.removeItem(LS_KEY);
   }, []);
 
-  // Auto-reconnect silently on mount
+
   useEffect(() => {
     if (!window.ethereum || localStorage.getItem(LS_KEY) !== '1') return;
     (async () => {
@@ -85,7 +84,7 @@ export function useWallet() {
     })();
   }, [fetchBalance]);
 
-  // MetaMask event listeners
+
   useEffect(() => {
     if (!window.ethereum) return;
     const onAccounts = (accounts) => {
@@ -93,7 +92,7 @@ export function useWallet() {
       setAccount(accounts[0]);
       fetchBalance(accounts[0]);
     };
-    const onChain = () => window.location.reload(); // simplest UX on chain switch
+    const onChain = () => window.location.reload();
     window.ethereum.on('accountsChanged', onAccounts);
     window.ethereum.on('chainChanged', onChain);
     return () => {

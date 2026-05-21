@@ -1,0 +1,65 @@
+# Node modules (across all packages)
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+pnpm-lock.yaml
+
+# Environment files
+.env
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.production
+
+# IDE and Editor
+.vscode/
+.idea/
+.fleet/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs
+dist/
+build/
+.turbo/
+.next/
+
+# Logs and outputs
+logs/
+*.log
+out.txt
+out/
+
+# Database
+pgdata/
+*.db
+*.sqlite
+*.sqlite3
+
+# Blockchain/Hardhat
+artifacts/
+cache/
+typechain-types/
+.openzeppelin/
+
+# Prisma (generated client can be regenerated if needed)
+# Note: If using edge deployment, may want to commit generated/
+
+# Testing
+coverage/
+.nyc_output/
+
+# Misc
+.DS_Store
+desktop.ini
+*.tmp
+*.temp

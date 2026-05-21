@@ -26,89 +26,7 @@ export function useMarketplace(onToast, wallet) {
     fetchListings();
   }, [fetchListings]);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const payment = params.get('payment');
-    const sessionId = params.get('session_id');
 
-    const clearPaymentParams = () => {
-      const next = new URLSearchParams(window.location.search);
-      next.delete('payment');
-      next.delete('session_id');
-      const query = next.toString();
-      const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}`;
-      window.history.replaceState({}, '', nextUrl);
-    };
-
-    if (payment === 'cancelled') {
-      onToast('error', 'Stripe checkout was cancelled.');
-      clearPaymentParams();
-      return;
-    }
-
-    if (payment !== 'success' || !sessionId) {
-      return;
-    }
-
-    let cancelled = false;
-    let attempts = 0;
-    const maxAttempts = 10;
-
-    const pollCheckout = async () => {
-      attempts += 1;
-      onToast('processing', 'Confirming Stripe payment and token transfer...');
-
-      try {
-        const res = await fetch(`${API_BASE}/checkout-session/${sessionId}`);
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data.error || 'Failed to confirm Stripe payment.');
-        }
-
-        if (data.fulfilled) {
-          if (cancelled) return;
-          const settlementNote =
-            data.sellerPayoutStatus === 'PENDING_OFF_PLATFORM_SETTLEMENT'
-              ? ' Seller settlement has been queued for admin processing.'
-              : '';
-          onToast('confirmed', `Purchase complete! Credits were delivered and retired.${settlementNote}`, data.retirementTxHash || '');
-          if (wallet.account) {
-            wallet.fetchBalance(wallet.account);
-          }
-          fetchListings();
-          clearPaymentParams();
-          return;
-        }
-
-        if (attempts < maxAttempts && data.paymentStatus === 'paid') {
-          window.setTimeout(() => {
-            if (!cancelled) {
-              void pollCheckout();
-            }
-          }, 2000);
-          return;
-        }
-
-        onToast('processing', 'Payment captured. Token transfer is still finalizing.');
-        fetchListings();
-        clearPaymentParams();
-      } catch (e) {
-        if (!cancelled) {
-          onToast('error', e.message || 'Failed to confirm Stripe checkout.');
-          clearPaymentParams();
-        }
-      }
-    };
-
-    void pollCheckout();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [fetchListings, onToast, wallet.account, wallet.fetchBalance]);
-
-  // Handle Listing
   const listCredits = async (amount, pricePerGHC) => {
     if (!wallet.account || !ESCROW_ADDRESS) {
       onToast('error', 'Wallet not connected or Escrow address missing.');
@@ -123,12 +41,10 @@ export function useMarketplace(onToast, wallet) {
       const signer = await provider.getSigner();
       const contract = new ethers.Contract(CONTRACT_ADDRESS, GHC_ABI, signer);
 
-      // 1. On-chain transfer to Admin/Escrow
       const tx = await contract.transfer(ESCROW_ADDRESS, toOnChain(amount));
       onToast('processing', `Escrowing ${amount} GHC...`, tx.hash);
       await tx.wait();
 
-      // 2. Register with backend
       onToast('processing', 'Registering listing...');
       const res = await fetch(`${API_BASE}/listings`, {
         method: 'POST',
@@ -155,7 +71,6 @@ export function useMarketplace(onToast, wallet) {
     }
   };
 
-  // Handle Purchase
   const buyCredits = async (listing) => {
     if (!wallet.account) {
       onToast('error', 'Connect wallet to buy.');
@@ -168,7 +83,7 @@ export function useMarketplace(onToast, wallet) {
     }
 
     setLoading(true);
-    onToast('processing', 'Redirecting to Stripe Checkout...');
+    onToast('processing', 'Processing Mock Checkout...');
 
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
@@ -193,16 +108,21 @@ export function useMarketplace(onToast, wallet) {
       const session = await sessionRes.json();
 
       if (!sessionRes.ok) {
-        throw new Error(session.error || 'Failed to create Stripe Checkout session.');
+        throw new Error(session.error || 'Failed to create checkout session.');
       }
 
-      if (!session.url) {
-        throw new Error('Stripe Checkout URL was not returned.');
+      if (session.success) {
+        onToast('confirmed', 'Purchase complete! Credits were delivered and retired.', session.retirementTxHash || '');
+        if (wallet.account) {
+          wallet.fetchBalance(wallet.account);
+        }
+        fetchListings();
+      } else {
+        throw new Error('Checkout failed to complete instantly.');
       }
-
-      window.location.assign(session.url);
     } catch (e) {
       onToast('error', e.message || 'Purchase failed');
+    } finally {
       setLoading(false);
     }
   };
