@@ -35,7 +35,7 @@ export default function Navbar({ account, accountName, connecting, onOpenModal, 
   };
 
   return (
-    <header className="sticky top-0 z-50 border-b border-[#1a1a1a] bg-[#0a0a0a]">
+    <header className="sticky top-0 z-50 border-b border-[#222222] bg-[#0e0e0e]">
       <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
 
         <div className="flex items-center gap-2.5">
@@ -55,7 +55,7 @@ export default function Navbar({ account, accountName, connecting, onOpenModal, 
                   'flex items-center gap-2 px-4 h-full text-xs font-medium transition-colors relative whitespace-nowrap',
                   isActive
                     ? 'text-[#e5e7eb]'
-                    : 'text-[#4b5563] hover:text-[#9ca3af]',
+                    : 'text-[#6b7280] hover:text-[#b0b7c0]',
                 ].join(' ')}
               >
                 {({ isActive }) => (
@@ -63,7 +63,7 @@ export default function Navbar({ account, accountName, connecting, onOpenModal, 
                     <Icon className="w-3.5 h-3.5" />
                     {label}
                     {isActive && (
-                      <span className="absolute bottom-0 left-0 right-0 h-px bg-[#e5e7eb]" />
+                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#e5e7eb]" />
                     )}
                   </>
                 )}
@@ -73,7 +73,7 @@ export default function Navbar({ account, accountName, connecting, onOpenModal, 
         </nav>
 
         <div className="flex items-center gap-2">
-          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#1a1a1a] bg-[#111111] text-xs text-[#4b5563] mr-2">
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#222222] bg-[#161616] text-xs text-[#6b7280] mr-2">
             Contract&nbsp;
             <a
               href={`https://sepolia.etherscan.io/address/${import.meta.env.VITE_CONTRACT_ADDRESS}`}

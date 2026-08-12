@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
-import { GHC_ABI, CONTRACT_ADDRESS, SEPOLIA_CHAIN_ID, fromOnChain } from '../lib/contract';
+import { notify } from '../components/ToastWidget';
+import { GHC_ABI, CONTRACT_ADDRESS, SEPOLIA_CHAIN_ID, fromOnChain } from '../contract';
 
 const LS_KEY = 'ghc_wallet_connected';
 
@@ -12,9 +13,6 @@ export function useWallet() {
   const [hasMinterRole, setHasMinterRole] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState(null);
-
-  const accountRef = useRef(null);
-  accountRef.current = account;
 
   const fetchBalance = useCallback(async (addr) => {
     if (!window.ethereum || !addr) return;
@@ -36,7 +34,12 @@ export function useWallet() {
   }, []);
 
   const connect = useCallback(async () => {
-    if (!window.ethereum) { setError('no_wallet'); return; }
+    if (!window.ethereum) {
+      setError('no_wallet');
+      notify.error('MetaMask extension not found. Opening download page...');
+      window.open('https://metamask.io/download/', '_blank');
+      return;
+    }
     setConnecting(true);
     setError(null);
     try {

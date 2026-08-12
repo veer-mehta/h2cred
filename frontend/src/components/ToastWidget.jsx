@@ -1,48 +1,41 @@
-import { useEffect, useState } from 'react';
-import { CheckCircle2, Loader2, ExternalLink, X, AlertTriangle } from 'lucide-react';
+import React from 'react';
+import toast, { Toaster } from 'react-hot-toast';
+import { CheckCircle2, AlertTriangle, Loader2, ExternalLink, X } from 'lucide-react';
 
-export default function ToastWidget({ status, message, txHash, onClose }) {
-  const [visible, setVisible] = useState(false);
-  const [out, setOut] = useState(false);
-
-  const dismiss = () => {
-    setOut(true);
-    setTimeout(() => { setVisible(false); onClose(); }, 300);
-  };
-
-  useEffect(() => {
-    if (status) {
-      setOut(false);
-      setVisible(true);
-      if (status === 'confirmed') {
-        const t = setTimeout(dismiss, 5000);
-        return () => clearTimeout(t);
-      }
-    }
-  }, [status, message, txHash]);
-
-  if (!visible || !status) return null;
-
-  const isOk = status === 'confirmed';
-  const isBad = status === 'error';
-  const isPrc = status === 'processing';
-
+export function ToastWidget() {
   return (
-    <div
-      className="fixed bottom-5 right-5 z-50 w-[340px]"
-      style={{ animation: `${out ? 'slide-down' : 'slide-up'} 0.25s ease-out both` }}
-    >
-      <style>{`
-        @keyframes slide-down { from{transform:translateY(0);opacity:1} to{transform:translateY(10px);opacity:0} }
-      `}</style>
+    <Toaster
+      position="bottom-right"
+      toastOptions={{ duration: 4000 }}
+    />
+  );
+}
 
+export const notify = {
+  success: (msg, txHash) => showToast('confirmed', msg, txHash),
+  error: (msg) => showToast('error', msg),
+  loading: (msg) => showToast('processing', msg),
+};
+
+function showToast(type, message, txHash) {
+  const isOk = type === 'confirmed';
+  const isBad = type === 'error';
+  const isPrc = type === 'processing';
+
+  return toast.custom(
+    (t) => (
       <div
-        className="card overflow-hidden"
+        className={`w-[340px] card overflow-hidden transition-all duration-200 ${
+          t.visible ? 'animate-slide-up' : 'opacity-0 translate-y-2'
+        }`}
         style={{
           borderColor: isOk ? '#0e2a0e' : isBad ? '#2a0e0e' : '#0e162a',
         }}
       >
-        <div className="h-px w-full" style={{ background: isOk ? '#4ade80' : isBad ? '#f87171' : '#60a5fa' }} />
+        <div
+          className="h-px w-full"
+          style={{ background: isOk ? '#4ade80' : isBad ? '#f87171' : '#60a5fa' }}
+        />
 
         <div className="p-4 flex gap-3">
           <div className="flex-shrink-0 mt-0.5">
@@ -59,15 +52,22 @@ export default function ToastWidget({ status, message, txHash, onClose }) {
               >
                 {isPrc ? 'Processing' : isOk ? 'Confirmed' : 'Failed'}
               </span>
-              <button onClick={dismiss} className="flex-shrink-0 p-0.5 rounded hover:bg-[#1a1a1a] transition-colors">
+              <button
+                onClick={() => toast.dismiss(t.id)}
+                className="flex-shrink-0 p-0.5 rounded hover:bg-[#1a1a1a] transition-colors"
+              >
                 <X className="w-3.5 h-3.5 text-[#374151]" />
               </button>
             </div>
+
             <p className="text-sm text-[#9ca3af] leading-snug mb-2">{message}</p>
+
             {txHash && (
               <div className="flex items-center gap-2">
                 <div className="flex-1 card-inner px-3 py-1.5 overflow-hidden">
-                  <code className="mono text-xs text-[#60a5fa] whitespace-nowrap">{txHash.length > 20 ? `${txHash.slice(0, 10)}...${txHash.slice(-8)}` : txHash}</code>
+                  <code className="mono text-xs text-[#60a5fa] whitespace-nowrap">
+                    {txHash.length > 20 ? `${txHash.slice(0, 10)}...${txHash.slice(-8)}` : txHash}
+                  </code>
                 </div>
                 <a
                   href={`https://sepolia.etherscan.io/tx/${txHash}`}
@@ -82,17 +82,10 @@ export default function ToastWidget({ status, message, txHash, onClose }) {
             )}
           </div>
         </div>
-
-        {isPrc && (
-          <div className="h-0.5 w-full overflow-hidden bg-[#111111]">
-            <div
-              className="h-full w-1/2 bg-[#60a5fa]"
-              style={{ animation: 'progress 1.8s ease-in-out infinite' }}
-            />
-          </div>
-        )}
-        <style>{`@keyframes progress{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}`}</style>
       </div>
-    </div>
+    ),
+    { id: isPrc ? 'processing-toast' : undefined, duration: isPrc ? Infinity : 4000 }
   );
 }
+
+export default ToastWidget;
